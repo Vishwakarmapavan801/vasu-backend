@@ -1,0 +1,23 @@
+{
+  "name": "vasu-realty-backend",
+  "version": "1.0.0",
+  "description": "Vasu Realty MLS Grid API Integration",
+  "main": "src/server.js",
+  "scripts": {
+    "start": "node src/server.js",
+    "dev": "node --watch src/server.js"
+  },
+  "keywords": ["mls", "real-estate", "api"],
+  "author": "",
+  "license": "ISC",
+  "type": "commonjs",
+  "dependencies": {
+    "axios": "^1.18.1",
+    "cors": "^2.8.6",
+    "dotenv": "^17.4.2",
+    "express": "^5.2.1",
+    "express-rate-limit": "^8.6.0",
+    "helmet": "^8.3.0",
+    "morgan": "^1.11.0"
+  }
+}
