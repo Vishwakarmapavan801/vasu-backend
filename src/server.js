@@ -1,4 +1,4 @@
-if (process.env.NODE_ENV !== 'production') {
+if (!process.env.RENDER) {
   require('dotenv').config();
 }
 
@@ -157,12 +157,9 @@ app.use(errorHandler);
 const serverPort = PORT || process.env.PORT || 5000;
 
 app.listen(serverPort, () => {
-  const dbHost = process.env.DATABASE_URL
-    ? new URL(process.env.DATABASE_URL).hostname
-    : process.env.DB_HOST || 'not set';
-  const dbName = process.env.DATABASE_URL
-    ? new URL(process.env.DATABASE_URL).pathname.replace('/', '')
-    : process.env.DB_NAME || 'not set';
+  const dbCfg = pool._dbConfig || {};
+  const dbHost = dbCfg.host || 'not set';
+  const dbName = dbCfg.database || (dbCfg.useDatabaseUrl ? new URL(dbCfg.connectionString).pathname.replace('/', '') : process.env.DB_NAME) || 'not set';
 
   console.log(`\n  Vasu Realty MLS API Server`);
   console.log(`  ─────────────────────────`);
@@ -171,6 +168,7 @@ app.listen(serverPort, () => {
   console.log(`  MLS Grid    : ${process.env.MLS_GRID_BASE_URL || 'not set'}`);
   console.log(`  Database    : ${dbName}`);
   console.log(`  Host        : ${dbHost}`);
+  console.log(`  Connection  : ${dbCfg.type || 'unknown'}`);
   console.log(`  CORS Origin : ${CLIENT_URL}`);
   console.log(`  ─────────────────────────`);
   console.log(`  Server running at http://localhost:${serverPort}\n`);
