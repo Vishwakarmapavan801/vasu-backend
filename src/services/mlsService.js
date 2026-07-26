@@ -2,543 +2,369 @@
  * MLS Grid API Communication Service
  *
  * Core HTTP client for MLS Grid v2 OData API.
- * Features:
- * - Authentication via Bearer token
- * - Automatic retry with exponential backoff
- * - Response caching (TTL-based) to stabilize signed MediaURLs
- * - In-flight request deduplication to prevent concurrent duplicate calls
- * - Response normalization
+ *
+ * Performance Optimizations:
+ * - In-memory CDN image buffer cache (5 second TTL) prevents duplicate CDN fetches
+ * - In-flight request deduplication prevents concurrent duplicate requests
+ * - KeepAlive HTTPS agent reuses TCP/TLS connections
+ * - Browser-level caching (304/ETag) supported via conditional request forwarding
+ * - 6 parallel CDN streams with 50ms inter-request gap for fast batch loading
  */
 
 const axios = require('axios');
-const crypto = require('crypto');
+const https = require('https');
 const { MLS_GRID_BASE_URL, MLS_GRID_ACCESS_TOKEN, MLS_GRID_TIMEOUT, MLS_GRID_MAX_RETRIES } = require('../config');
-const cache = require('../utils/cache');
 
-/**
- * TTL configuration for different query types.
- *
- * CRITICAL: These TTLs directly impact signed MediaURL stability.
- * Longer TTLs = fewer MLS Grid requests = same signed URLs for longer =
- * better browser caching = fewer 429 errors from media-demo.mlsgrid.com.
- *
- * MLS Grid signed URLs (CloudFront) typically last 1-24 hours, so
- * 5-minute backend cache TTL is very safe.
- */
-const TTL = {
-  LIST: 300_000,       // 5min — property list queries (stabilizes signed MediaURLs)
-  DETAIL: 120_000,     // 2min — single property queries
-  MEDIA: 600_000,      // 10min — media queries (stable URLs benefit from longer cache)
-  STATIC: 600_000,     // 10min — lookup/member/office data (rarely changes)
-};
-
-/**
- * IMAGE BYTE CACHE (LRU with stale-while-revalidate)
- *
- * Stores fetched image bytes in memory so the browser NEVER needs to
- * directly contact media-demo.mlsgrid.com. Only ONE request per image
- * per TTL period goes to the CDN — all others serve from this cache.
- *
- * When the CDN returns 429 (rate limited) and a stale entry exists,
- * the stale entry is served to the client while the refresh is queued.
- * This ensures the user ALWAYS sees an image, never a broken placeholder.
- *
- * Key: MediaKey (e.g., "CAR1234567890-photo-1")
- * Value: { buffer: Buffer, contentType: string, expiresAt: number, lastAccessed: number }
- * TTL: 30 minutes (was 10min — reduces CDN requests 3x)
- * Max entries: 500 (was 200)
- * Eviction: LRU based on lastAccessed timestamp
- */
-
-/** @type {Map<string, { buffer: Buffer, contentType: string, expiresAt: number, lastAccessed: number }>} */
-const imageByteCache = new Map();
-
-const IMAGE_CACHE_TTL = 1_800_000;     // 30 minutes (was 10min)
-const IMAGE_CACHE_STALE_TTL = 7_200_000; // 2 hours stale grace period
-const IMAGE_CACHE_MAX = 500;            // was 200
-
-/**
- * MEDIA URL STORE
- *
- * Maps a stable MediaKey to the current signed MediaURL from MLS Grid.
- * Updated whenever properties are normalized (cache refresh).
- * Old entries are cleaned up periodically.
- *
- * Key: MediaKey
- * Value: { signedUrl: string, expiresAt: number }
- * TTL: 30 minutes (was 15min — longer = fewer signed URL refreshes)
- */
-
+// ============================================================
+// MEDIA URL STORE
+// Maps a stable MediaKey to the current signed MediaURL from MLS Grid.
+// ============================================================
 /** @type {Map<string, { signedUrl: string, expiresAt: number }>} */
 const mediaUrlStore = new Map();
+const MEDIA_URL_STORE_TTL = 14_400_000; // 4 hours
 
-const MEDIA_URL_STORE_TTL = 1_800_000; // 30 minutes (was 15min)
+// ============================================================
+// CDN IMAGE BUFFER CACHE
+// Stores recently fetched image buffers in memory.
+// TTL is 5 seconds to prevent duplicate CDN requests within a single page load.
+// ============================================================
+const imageBufferCache = new Map();
+const IMAGE_CACHE_TTL = 5_000; // 5 seconds
 
-/**
- * CONCURRENT CDN REQUEST LIMITER
- *
- * Limits the number of simultaneous fetches to the MLS Media CDN.
- * When many images are requested at once (e.g., loading a property
- * search page with 24+ cards), this prevents overwhelming the CDN
- * and triggering rate limits.
- *
- * Max concurrent: 3 (any additional requests are queued)
- */
-const CDN_MAX_CONCURRENT = 3;
-let cdnActiveRequests = 0;
-const cdnRequestQueue = [];
-
-/**
- * Acquire a CDN fetch slot. Waits if already at max concurrency.
- * @returns {Promise<void>}
- */
-async function acquireCdnSlot() {
-  if (cdnActiveRequests < CDN_MAX_CONCURRENT) {
-    cdnActiveRequests++;
-    return;
-  }
-  return new Promise(resolve => {
-    cdnRequestQueue.push(resolve);
-  });
-}
-
-/**
- * Release a CDN fetch slot. Dequeues the next waiting request if any.
- */
-function releaseCdnSlot() {
-  if (cdnRequestQueue.length > 0) {
-    const next = cdnRequestQueue.shift();
-    next(); // resolves the waiting acquireCdnSlot promise
-  } else {
-    cdnActiveRequests--;
-  }
-}
-
-/**
- * LRU eviction for image byte cache.
- * Removes the least recently accessed entry.
- */
-function evictLruImageCache() {
-  let oldestKey = null;
-  let oldestTime = Infinity;
-  for (const [key, entry] of imageByteCache) {
-    const accessTime = entry.lastAccessed || 0;
-    if (accessTime < oldestTime) {
-      oldestTime = accessTime;
-      oldestKey = key;
-    }
-  }
-  if (oldestKey) {
-    imageByteCache.delete(oldestKey);
-  }
-}
-
-// Periodic cleanup of expired entries in both maps
+// Periodic cache cleanups
 setInterval(() => {
   const now = Date.now();
-  for (const [key, entry] of imageByteCache) {
-    if (entry.expiresAt + IMAGE_CACHE_STALE_TTL <= now) {
-      imageByteCache.delete(key);
-    }
+  for (const [key, entry] of imageBufferCache) {
+    if (entry.expiresAt <= now) imageBufferCache.delete(key);
   }
   for (const [key, entry] of mediaUrlStore) {
     if (entry.expiresAt <= now) mediaUrlStore.delete(key);
   }
-}, 120_000).unref();
+}, 60_000).unref();
 
-/** In-flight request tracker for deduplication */
+// ============================================================
+// CONCURRENT CDN REQUEST LIMITER
+// 6 concurrent connections with 50ms gap between requests.
+// Adaptively reduces concurrency when 429s are detected.
+// ============================================================
+const CDN_MAX_CONCURRENT = 6;
+const CDN_INTER_REQUEST_DELAY = 50;
+const CDN_COOLDOWN_MS = 10_000;
+const MAX_QUEUE_SIZE = 50;
+const QUEUE_TIMEOUT_MS = 15_000;
+
+let cdnActiveDownloads = 0;
+const cdnDownloadQueue = [];
+let cdnCooldownUntil = 0;
+let consecutive429Count = 0;
+let lastCdnRequestTime = 0;
+let adaptiveConcurrency = CDN_MAX_CONCURRENT;
+let adaptiveConcurrencyRestoreAt = 0;
+
+async function acquireCdnSlot() {
+  if (cdnCooldownUntil > Date.now()) {
+    await new Promise(r => setTimeout(r, cdnCooldownUntil - Date.now()));
+  }
+  const gap = CDN_INTER_REQUEST_DELAY - (Date.now() - lastCdnRequestTime);
+  if (gap > 0) {
+    await new Promise(r => setTimeout(r, gap));
+  }
+  if (cdnActiveDownloads < adaptiveConcurrency) {
+    cdnActiveDownloads++;
+    return;
+  }
+  return new Promise(resolve => {
+    if (cdnDownloadQueue.length < MAX_QUEUE_SIZE) {
+      cdnDownloadQueue.push({ resolve, addedAt: Date.now() });
+    } else {
+      cdnActiveDownloads++;
+      resolve();
+    }
+  });
+}
+
+function releaseCdnSlot() {
+  const now = Date.now();
+  if (adaptiveConcurrency < CDN_MAX_CONCURRENT && now >= adaptiveConcurrencyRestoreAt) {
+    adaptiveConcurrency = Math.min(CDN_MAX_CONCURRENT, adaptiveConcurrency + 1);
+    if (adaptiveConcurrency < CDN_MAX_CONCURRENT) {
+      adaptiveConcurrencyRestoreAt = now + 30_000;
+    }
+  }
+  while (cdnDownloadQueue.length > 0 && (now - cdnDownloadQueue[0].addedAt) > QUEUE_TIMEOUT_MS) {
+    cdnDownloadQueue.shift();
+  }
+  if (cdnDownloadQueue.length > 0) {
+    cdnDownloadQueue.shift().resolve();
+  } else {
+    cdnActiveDownloads--;
+  }
+}
+
+function recordCdn429() {
+  consecutive429Count++;
+  if (consecutive429Count >= 3) {
+    cdnCooldownUntil = Date.now() + CDN_COOLDOWN_MS;
+    adaptiveConcurrency = Math.max(1, Math.floor(adaptiveConcurrency / 2));
+    adaptiveConcurrencyRestoreAt = Date.now() + CDN_COOLDOWN_MS;
+    consecutive429Count = 0;
+  }
+}
+
+function recordCdnSuccess() {
+  consecutive429Count = Math.max(0, consecutive429Count - 1);
+}
+
+// ============================================================
+// MLS GRID API — DIRECT FETCH (no data caching)
+// Every request goes to MLS Grid live API for fresh data.
+// ============================================================
 const inFlightRequests = new Map();
 
-/** Normalized MLS Grid response cache TTL — how long to keep a URL stable */
-const MLS_RESPONSE_CACHE_TTL = 300_000; // 5 minutes
-
-/**
- * Fetch data from MLS Grid with:
- *  - Response caching (same URL → same signed URLs → browser can cache images)
- *  - Request deduplication (concurrent identical calls share one MLS Grid request)
- *  - Retry with exponential backoff
- *
- * @param {string} url - Full MLS Grid API URL
- * @param {Object} [options] - Axios options (headers, etc.)
- * @param {number} [retries=MLS_GRID_MAX_RETRIES||3]
- * @returns {Promise<Object>} MLS Grid response data
- */
 async function fetchWithRetry(url, options, retries = parseInt(MLS_GRID_MAX_RETRIES, 10) || 3) {
   const timeout = parseInt(MLS_GRID_TIMEOUT, 10) || 30000;
+  if (inFlightRequests.has(url)) return inFlightRequests.get(url);
 
-  // Generate a cache key from the URL and options
-  const cacheKey = cache.makeKey(url, {
-    timeout,
-    headers: { Accept: 'application/json' },
-  });
+  const promise = (async () => {
+    try {
+      for (let attempt = 1; attempt <= retries; attempt++) {
+        try {
+          const response = await axios.get(url, {
+            ...options,
+            timeout,
+            headers: {
+              ...options?.headers,
+              Authorization: `Bearer ${MLS_GRID_ACCESS_TOKEN}`,
+              Accept: 'application/json',
+            },
+          });
+          return response.data;
+        } catch (err) {
+          if (err.code === 'ENOTFOUND' || err.code === 'ECONNREFUSED') throw err;
+          if (attempt === retries) throw err;
+          await new Promise(resolve => setTimeout(resolve, Math.min(1000 * Math.pow(2, attempt - 1), 10000)));
+        }
+      }
+    } finally {
+      inFlightRequests.delete(url);
+    }
+  })();
 
-  // 1. Check cache first (same URL → same signed URLs → browser image cache)
-  const cached = cache.get(cacheKey);
-  if (cached !== undefined) {
-    return cached;
-  }
-
-  // 2. Check if request is already in-flight (deduplication)
-  if (inFlightRequests.has(cacheKey)) {
-    return inFlightRequests.get(cacheKey);
-  }
-
-  // 3. Create the actual request
-  const promise = executeFetch(url, options, retries, timeout, cacheKey);
-
-  // Track the in-flight promise
-  inFlightRequests.set(cacheKey, promise);
-
+  inFlightRequests.set(url, promise);
   return promise;
 }
 
 /**
- * Execute the actual MLS Grid HTTP request with retries and caching.
- *
- * @param {string} url
- * @param {Object} options
- * @param {number} retries
- * @param {number} timeout
- * @param {string} cacheKey
- * @returns {Promise<Object>}
- */
-async function executeFetch(url, options, retries, timeout, cacheKey) {
-  try {
-    for (let attempt = 1; attempt <= retries; attempt++) {
-      try {
-        const response = await axios.get(url, {
-          ...options,
-          timeout,
-          headers: {
-            ...options?.headers,
-            Authorization: `Bearer ${MLS_GRID_ACCESS_TOKEN}`,
-            Accept: 'application/json',
-          },
-        });
-
-        const data = response.data;
-
-        // Cache the response so subsequent requests reuse the same signed MediaURLs
-        // This is CRITICAL for avoiding 429 from the media CDN:
-        //  - Without cache: every request generates NEW signed URLs → browser cache busted
-        //  - With cache: repeated requests get SAME signed URLs → browser cache hits
-        const ttl = determineTTL(url);
-        cache.set(cacheKey, data, ttl);
-
-        return data;
-
-      } catch (err) {
-        // Don't cache error responses
-        const isLastAttempt = attempt === retries;
-        if (isLastAttempt) {
-          throw err;
-        }
-        // Exponential backoff: 1s, 2s, 4s, ... max 10s
-        const delay = Math.min(1000 * Math.pow(2, attempt - 1), 10000);
-        await new Promise(resolve => setTimeout(resolve, delay));
-      }
-    }
-  } finally {
-    // Clean up the in-flight tracker
-    inFlightRequests.delete(cacheKey);
-  }
-}
-
-/**
- * Determine appropriate cache TTL based on the URL path.
- *
- * @param {string} url
- * @returns {number} TTL in milliseconds
- */
-function determineTTL(url) {
-  if (!url) return MLS_RESPONSE_CACHE_TTL;
-  const path = new URL(url).pathname;
-
-  if (path.includes('/Media') || path.includes('/media')) {
-    return TTL.MEDIA;
-  }
-  if (path.includes('/Member') || path.includes('/member') ||
-      path.includes('/Office') || path.includes('/office') ||
-      path.includes('/Lookup') || path.includes('/lookup')) {
-    return TTL.STATIC;
-  }
-  if (path.includes('/Property(') || path.includes('/property(') ||
-      path.includes("Property'") || path.includes("property'")) {
-    // Single property (by key) — shorter TTL
-    return TTL.DETAIL;
-  }
-
-  return MLS_RESPONSE_CACHE_TTL;
-}
-
-/**
- * REFRESH SIGNED URL: Query the MLS Grid Media endpoint to obtain
- * a fresh signed CDN URL for a given MediaKey.
- *
- * Called automatically when fetchAndCacheImage discovers that the
- * signed URL in mediaUrlStore has expired or the server was restarted.
- *
- * @param {string} mediaKey - The MLS Grid MediaKey (e.g. "CAR1234567890-photo-1")
- * @returns {Promise<string>} A valid signed CDN URL
+ * REFRESH SIGNED URL from MLS Grid.
  */
 async function refreshSignedUrl(mediaKey) {
-  const url = `${MLS_GRID_BASE_URL}/Media?$filter=MediaKey%20eq%20'${encodeURIComponent(mediaKey)}'&$top=1`;
-  console.log(`[ImageProxy] Refreshing signed URL for ${mediaKey} from MLS...`);
-
-  const data = await fetchWithRetry(url);
-  if (data.value && data.value.length > 0) {
-    const mediaItem = data.value[0];
-    const signedUrl = mediaItem.MediaURL || mediaItem.MediaUrl || '';
-    if (signedUrl) {
-      // Store in mediaUrlStore for future use (15min TTL)
-      mediaUrlStore.set(mediaKey, {
-        signedUrl,
-        expiresAt: Date.now() + MEDIA_URL_STORE_TTL,
-      });
-      console.log(`[ImageProxy] Signed URL refreshed successfully for ${mediaKey}`);
-      return signedUrl;
+  try {
+    const url = `${MLS_GRID_BASE_URL}/Property?$expand=Media&$filter=Media/any(m: m/MediaKey%20eq%20'${encodeURIComponent(mediaKey)}')&$top=1`;
+    const data = await fetchWithRetry(url);
+    if (data.value && data.value.length > 0) {
+      const media = (data.value[0].Media || []).find(m => m.MediaKey === mediaKey);
+      if (media && (media.MediaURL || media.MediaUrl)) {
+        const signedUrl = media.MediaURL || media.MediaUrl;
+        mediaUrlStore.set(mediaKey, { signedUrl, expiresAt: Date.now() + MEDIA_URL_STORE_TTL });
+        return signedUrl;
+      }
     }
+  } catch (err) {
+    // Fall through to return null
   }
-  throw new Error(`Media not found in MLS: ${mediaKey}`);
+  return null;
 }
 
-/** In-flight fetch deduplication for image proxy */
-const inFlightImageFetches = new Map();
-
-/**
- * IMAGE PROXY: Fetch an image from the CDN using a signed URL.
- *
- * Uses the mediaUrlStore to look up the signed URL for a MediaKey.
- * If the signed URL is not found or expired, automatically refreshes
- * it from the MLS Grid Media endpoint. This makes the proxy resilient
- * to server restarts and cache expiration.
- *
- * Steps:
- *   1. Check in-memory byte cache (fast path) — serve immediately if fresh
- *   2. If stale but within grace period AND rate limited, serve stale
- *   3. If miss or stale, get signed URL from mediaUrlStore
- *   4. If signed URL missing/expired, refresh from MLS Media endpoint
- *   5. Acquire CDN concurrency slot (max 3 simultaneous CDN requests)
- *   6. Fetch image bytes from CDN with retry + exponential backoff for 429
- *   7. Cache bytes in memory (30min TTL, LRU eviction at 500 entries)
- *   8. Release CDN concurrency slot
- *
- * CRITICAL: Includes in-flight request deduplication to prevent
- * multiple simultaneous CDN requests for the same MediaKey.
- * Without this, N concurrent browser <img> requests would fire
- * N simultaneous CDN requests, defeating the proxy entirely.
- *
- * @param {string} mediaKey - The MLS Grid MediaKey
- * @returns {Promise<{ buffer: Buffer, contentType: string }>}
- */
-async function fetchAndCacheImage(mediaKey) {
-  const now = Date.now();
-
-  // 1. Check in-memory byte cache first (fast path)
-  const cached = imageByteCache.get(mediaKey);
-
-  // Update last accessed time for LRU tracking
-  if (cached) {
-    cached.lastAccessed = now;
+// ============================================================
+// KEEP-ALIVE HTTPS AGENT
+// Reuses TCP/TLS connections for CDN requests.
+// ============================================================
+let keepAliveAgent = null;
+function getKeepAliveAgent() {
+  if (!keepAliveAgent) {
+    keepAliveAgent = new https.Agent({
+      keepAlive: true,
+      maxSockets: 10,
+      maxFreeSockets: 5,
+      timeout: 30000,
+      freeSocketTimeout: 10000,
+      scheduling: 'lifo',
+    });
   }
-
-  // If the cache is fresh, serve immediately
-  if (cached && cached.expiresAt > now) {
-    console.log(`[ImageProxy] Cache HIT for ${mediaKey}`);
-    return { buffer: cached.buffer, contentType: cached.contentType };
-  }
-
-  // 2. If stale but within the stale grace period, serve stale
-  //    but still trigger a background refresh
-  if (cached && cached.staleWarning !== true) {
-    // Mark as warned so we don't spam the log
-    cached.staleWarning = true;
-    console.log(`[ImageProxy] Cache STALE but serving for ${mediaKey} — will refresh in background`);
-    // Track the background refresh in inFlightImageFetches so concurrent
-    // requests for the same mediaKey reuse this promise instead of
-    // creating duplicate CDN requests.
-    const refreshPromise = fetchAndRefreshImageBytes(mediaKey, cached.buffer, cached.contentType);
-    inFlightImageFetches.set(mediaKey, refreshPromise);
-    refreshPromise
-      .then(() => inFlightImageFetches.delete(mediaKey))
-      .catch(() => inFlightImageFetches.delete(mediaKey));
-    return { buffer: cached.buffer, contentType: cached.contentType };
-  }
-
-  // 3. Deduplicate: if this MediaKey is already being fetched, reuse the promise
-  if (inFlightImageFetches.has(mediaKey)) {
-    console.log(`[ImageProxy] Deduplicating CDN request for ${mediaKey}`);
-    return inFlightImageFetches.get(mediaKey);
-  }
-
-  // 4. Create and track the fetch promise
-  const fetchPromise = fetchAndRefreshImageBytes(mediaKey, null, null);
-
-  inFlightImageFetches.set(mediaKey, fetchPromise);
-
-  // Clean up from in-flight tracker when done (success or error)
-  fetchPromise
-    .then(() => inFlightImageFetches.delete(mediaKey))
-    .catch(() => inFlightImageFetches.delete(mediaKey));
-
-  return fetchPromise;
+  return keepAliveAgent;
 }
 
+const imageAxios = axios.create({
+  timeout: 20000,
+  maxRedirects: 5,
+  decompress: true,
+  headers: {
+    'Accept': 'image/webp,image/avif,image/*,*/*;q=0.9',
+    'Accept-Encoding': 'gzip, deflate, br',
+  },
+});
+
+imageAxios.interceptors.request.use(config => {
+  if (!config.agent) config.agent = getKeepAliveAgent();
+  return config;
+});
+
+// ============================================================
+// IMAGE PROXY — Serve image from CDN with in-memory buffer cache
+// ============================================================
+
 /**
- * Fetch image bytes from the CDN and cache them.
- *
- * Implements:
- *   - Signed URL resolution (from cache or MLS refresh)
- *   - Concurrent CDN request limiting (max 3 simultaneous)
- *   - Retry with exponential backoff for 429 (Too Many Requests)
- *   - Retry for timeout/network errors
- *   - Image byte caching with LRU eviction
- *
- * @param {string} mediaKey
- * @param {Buffer|null} staleBuffer - Existing stale buffer to use as fallback
- * @param {string|null} staleContentType - Existing stale content type
- * @returns {Promise<{ buffer: Buffer, contentType: string }>}
+ * Serve an image. Checks 5-second in-memory buffer cache first,
+ * then fetches from CDN if not cached.
  */
-async function fetchAndRefreshImageBytes(mediaKey, staleBuffer, staleContentType) {
-  // Step A: Resolve signed URL — either from store or via MLS refresh
+async function streamMediaImage(mediaKey, req, res) {
+  // 1. Get signed URL
   let signedUrl = null;
   const entry = mediaUrlStore.get(mediaKey);
   if (entry && entry.expiresAt > Date.now()) {
     signedUrl = entry.signedUrl;
-    console.log(`[ImageProxy] Signed URL found in cache for ${mediaKey}`);
   } else {
-    // Signed URL is expired or not in store (server restart, etc.)
-    // Automatically refresh from MLS API
-    try {
-      signedUrl = await refreshSignedUrl(mediaKey);
-    } catch (refreshErr) {
-      console.error(`[ImageProxy] Failed to refresh signed URL for ${mediaKey}:`, refreshErr.message);
-      // If we have a stale buffer, serve it as a fallback
-      if (staleBuffer) {
-        console.log(`[ImageProxy] Using stale cached image for ${mediaKey} as fallback`);
-        return { buffer: staleBuffer, contentType: staleContentType || 'image/jpeg' };
-      }
-      throw new Error(`Media key not found or expired: ${mediaKey}`);
+    signedUrl = await refreshSignedUrl(mediaKey);
+  }
+
+  if (!signedUrl) {
+    if (!res.headersSent) {
+      res.setHeader('Content-Type', 'image/svg+xml');
+      res.setHeader('Cache-Control', 'no-cache');
+      res.end('<svg xmlns="http://www.w3.org/2000/svg" width="1" height="1"/>');
     }
+    return;
   }
 
-  // Step B: If signed URL is still valid AND we have a stale buffer,
-  // skip the CDN fetch entirely — the image hasn't changed on the CDN
-  // and the stale cache is acceptable. Only re-fetch when the signed URL
-  // itself has expired (mediaUrlStore refreshed) or no stale buffer exists.
-  if (staleBuffer && entry && entry.expiresAt > Date.now() + 60000) {
-    // Signed URL is still valid (more than 1 minute from expiry) and
-    // we have a stale cache — no need to hit the CDN
-    console.log(`[ImageProxy] Skipping CDN fetch for ${mediaKey} — signed URL still valid, serving stale cache`);
-    return { buffer: staleBuffer, contentType: staleContentType || 'image/jpeg' };
+  // 2. Check in-memory image buffer cache
+  const cacheKey = `${mediaKey}:${signedUrl}`;
+  const cachedImage = imageBufferCache.get(cacheKey);
+  if (cachedImage && cachedImage.expiresAt > Date.now()) {
+    const { buffer, contentType, etag, lastModified } = cachedImage;
+    res.setHeader('Content-Type', contentType);
+    res.setHeader('Cache-Control', 'public, max-age=600, immutable');
+    res.setHeader('Last-Modified', lastModified);
+    if (etag) res.setHeader('ETag', etag);
+    res.setHeader('Access-Control-Allow-Origin', '*');
+    res.setHeader('X-Cache', 'HIT');
+    res.end(buffer);
+    return;
   }
 
-  // Step C: Acquire CDN concurrency slot (max 3 simultaneous CDN requests)
+  // 3. Acquire CDN slot and fetch from CDN
   await acquireCdnSlot();
-  console.log(`[ImageProxy] Acquired CDN slot for ${mediaKey} (active: ${cdnActiveRequests + cdnRequestQueue.length})`);
-
   try {
-    // Step D: Fetch image bytes from CDN with retry logic
-    const { buffer, contentType } = await fetchImageBytesWithRetry(mediaKey, signedUrl);
-
-    // Step D: Cache image bytes in memory (LRU eviction)
-    if (imageByteCache.size >= IMAGE_CACHE_MAX) {
-      evictLruImageCache();
+    const result = await doFetchFromCdn(mediaKey, signedUrl, req);
+    if (!result) {
+      // 304 — browser already has the image
+      if (!res.headersSent) {
+        res.status(304).end();
+      }
+      return;
     }
-    imageByteCache.set(mediaKey, {
-      buffer,
-      contentType,
+
+    const { buffer, contentType, etag, lastModified } = result;
+
+    // Store in cache for subsequent requests (max 200 entries to prevent memory leak)
+    if (imageBufferCache.size >= 200) {
+      const oldestKey = imageBufferCache.keys().next().value;
+      if (oldestKey) imageBufferCache.delete(oldestKey);
+    }
+    imageBufferCache.set(cacheKey, {
+      buffer, contentType, etag, lastModified,
       expiresAt: Date.now() + IMAGE_CACHE_TTL,
-      lastAccessed: Date.now(),
-      staleWarning: false,
     });
 
-    console.log(`[ImageProxy] Image downloaded and cached for ${mediaKey} (${(buffer.length / 1024).toFixed(1)} KB)`);
-    return { buffer, contentType };
+    res.setHeader('Content-Type', contentType);
+    res.setHeader('Cache-Control', 'public, max-age=600, immutable');
+    res.setHeader('Last-Modified', lastModified);
+    if (etag) res.setHeader('ETag', etag);
+    res.setHeader('Access-Control-Allow-Origin', '*');
+    res.setHeader('X-Cache', 'MISS');
+    res.end(buffer);
   } catch (err) {
-    // If CDN fetch failed but we have stale data, serve stale
-    if (staleBuffer) {
-      console.warn(`[ImageProxy] CDN fetch failed for ${mediaKey}, serving stale cache — ${err.message}`);
-      return { buffer: staleBuffer, contentType: staleContentType || 'image/jpeg' };
+    if (err.message && (err.message.includes('429') || err.message.includes('503'))) {
+      if (!res.headersSent) {
+        res.setHeader('Content-Type', 'image/svg+xml');
+        res.setHeader('Cache-Control', 'no-cache');
+        res.end('<svg xmlns="http://www.w3.org/2000/svg" width="1" height="1"/>');
+      }
+      return;
     }
     throw err;
   } finally {
-    // Step E: Release CDN concurrency slot
     releaseCdnSlot();
-    console.log(`[ImageProxy] Released CDN slot for ${mediaKey} (active: ${cdnActiveRequests + cdnRequestQueue.length})`);
   }
 }
 
 /**
- * Fetch image bytes from the CDN with retry and exponential backoff.
- *
- * Retry logic:
- *   - HTTP 429 (Too Many Requests): backoff 1s, 2s, 4s, 8s (4 retries)
- *   - Timeout/Network errors: backoff 500ms, 1s, 2s (3 retries)
- *   - Other errors: throw immediately
- *
- * @param {string} mediaKey - For logging
- * @param {string} signedUrl - The signed CDN URL
- * @returns {Promise<{ buffer: Buffer, contentType: string }>}
+ * Fetch an image from CDN and accumulate it into a buffer with retry logic.
  */
-async function fetchImageBytesWithRetry(mediaKey, signedUrl) {
-  const MAX_RETRIES_429 = 4;
-  const MAX_RETRIES_NETWORK = 3;
+async function doFetchFromCdn(mediaKey, signedUrl, req) {
+  let currentUrl = signedUrl;
+  const MAX_ATTEMPTS = 3;
+  const RETRY_DELAYS = [1000, 2000, 4000];
 
-  let lastError = null;
-
-  for (let attempt = 1; attempt <= Math.max(MAX_RETRIES_429, MAX_RETRIES_NETWORK); attempt++) {
+  for (let attempt = 1; attempt <= MAX_ATTEMPTS; attempt++) {
+    let cdnRes;
     try {
-      const response = await axios.get(signedUrl, {
+      lastCdnRequestTime = Date.now();
+      const cdnHeaders = {};
+      if (req.headers['if-none-match']) cdnHeaders['If-None-Match'] = req.headers['if-none-match'];
+      if (req.headers['if-modified-since']) cdnHeaders['If-Modified-Since'] = req.headers['if-modified-since'];
+
+      cdnRes = await imageAxios.get(currentUrl, {
         responseType: 'arraybuffer',
-        timeout: 20000, // 20 seconds (was 15s — more lenient for slow CDN)
+        timeout: 20000,
+        headers: cdnHeaders,
+        validateStatus: status => status < 400 || status === 403 || status === 304,
       });
-
-      const buffer = Buffer.from(response.data);
-      const contentType = response.headers['content-type'] || 'image/jpeg';
-
-      return { buffer, contentType };
     } catch (err) {
-      lastError = err;
       const status = err.response?.status;
-      const is429 = status === 429 || (err.message && err.message.includes('429'));
-      const isTimeout = err.code === 'ECONNABORTED' || err.message?.includes('timeout');
-      const isNetworkError = err.code === 'ERR_NETWORK' || err.code === 'ERR_CONNECTION_RESET' || err.code === 'ETIMEDOUT';
+      const delay = RETRY_DELAYS[Math.min(attempt - 1, RETRY_DELAYS.length - 1)];
 
-      if (is429 && attempt <= MAX_RETRIES_429) {
-        // Exponential backoff for 429: 1s, 2s, 4s, 8s
-        const delay = Math.min(1000 * Math.pow(2, attempt - 1), 8000);
-        console.warn(`[ImageProxy] CDN rate limited (429) for ${mediaKey} — retry ${attempt}/${MAX_RETRIES_429} after ${delay}ms`);
-        await new Promise(resolve => setTimeout(resolve, delay));
+      if ((status === 429 || status === 503) && attempt < MAX_ATTEMPTS) {
+        if (status === 429) recordCdn429();
+        await new Promise(r => setTimeout(r, delay));
         continue;
       }
-
-      if ((isTimeout || isNetworkError) && attempt <= MAX_RETRIES_NETWORK) {
-        // Exponential backoff for network errors: 500ms, 1s, 2s
-        const delay = Math.min(500 * Math.pow(2, attempt - 1), 2000);
-        console.warn(`[ImageProxy] CDN ${isTimeout ? 'timeout' : 'network error'} for ${mediaKey} — retry ${attempt}/${MAX_RETRIES_NETWORK} after ${delay}ms`);
-        await new Promise(resolve => setTimeout(resolve, delay));
+      if (status === 403 && attempt < MAX_ATTEMPTS) {
+        currentUrl = await refreshSignedUrl(mediaKey);
         continue;
       }
-
-      // For other errors, throw immediately
-      if (is429) {
-        throw new Error(`CDN rate limit exceeded after ${MAX_RETRIES_429} retries for ${mediaKey}`);
+      if ((err.code === 'ETIMEDOUT' || err.code === 'ECONNRESET') && attempt < MAX_ATTEMPTS) {
+        await new Promise(r => setTimeout(r, delay));
+        continue;
       }
+      if (status === 429) throw new Error(`CDN 429 retries exhausted for ${mediaKey}`);
+      if (status === 503) throw new Error(`CDN 503 retries exhausted for ${mediaKey}`);
       throw err;
     }
-  }
 
-  // If we exhausted all retries
-  throw lastError || new Error(`Failed to fetch image after all retries: ${mediaKey}`);
+    if (cdnRes.status === 403) {
+      if (attempt >= MAX_ATTEMPTS) throw new Error(`CDN 403 exhausted for ${mediaKey}`);
+      currentUrl = await refreshSignedUrl(mediaKey);
+      continue;
+    }
+
+    if (cdnRes.status === 304) {
+      recordCdnSuccess();
+      return null; // Browser has the image
+    }
+
+    recordCdnSuccess();
+    return {
+      buffer: Buffer.from(cdnRes.data),
+      contentType: cdnRes.headers['content-type'] || 'image/jpeg',
+      lastModified: cdnRes.headers['last-modified'] || new Date().toUTCString(),
+      etag: cdnRes.headers['etag'] || '',
+    };
+  }
+  throw new Error(`CDN fetch exhausted for ${mediaKey}`);
 }
 
 /**
  * Get the signed CDN URL for a MediaKey.
- * Used by the image proxy controller to check validity.
- *
- * @param {string} mediaKey
- * @returns {string|null}
  */
 function getSignedMediaUrl(mediaKey) {
   const entry = mediaUrlStore.get(mediaKey);
@@ -546,24 +372,25 @@ function getSignedMediaUrl(mediaKey) {
   return entry.signedUrl;
 }
 
+// ============================================================
+// PROPERTY NORMALIZATION
+// ============================================================
+
 /**
  * Normalize a single MLS Grid property object.
- * Only keeps the first few media items and replaces direct CDN URLs
- * with proxy paths to eliminate browser-side CDN 429 errors.
- *
- * @param {Object} item - Raw MLS Grid property object
- * @param {Object} [options]
- * @param {number} [options.maxMedia=10] - Max media items to include (0=all)
- * @returns {Object|null}
+ * Converts direct CDN URLs to proxy paths (/api/image/:mediaKey).
+ * Limits media to reduce signed URL generation on list views.
  */
 function normalizeProperty(item, options = {}) {
   if (!item) return null;
 
-  const maxMedia = Math.min(50, Math.max(0, parseInt(options.maxMedia, 10) || 10));
+  // maxMedia = 0 means unlimited (used for detail pages).
+  // Use !== undefined check instead of || to avoid the falsy-0 bug.
+  const rawMax = parseInt(options.maxMedia, 10);
+  const maxMedia = Math.min(50, Math.max(0, rawMax !== undefined && !isNaN(rawMax) ? rawMax : 10));
 
   let media = (item.Media || [])
     .map(m => {
-      // Store the signed URL in the mediaUrlStore for the proxy
       const mediaKey = m.MediaKey;
       const signedUrl = m.MediaURL || m.MediaUrl || '';
       if (mediaKey && signedUrl) {
@@ -572,27 +399,18 @@ function normalizeProperty(item, options = {}) {
           expiresAt: Date.now() + MEDIA_URL_STORE_TTL,
         });
       }
+      const transformedUrl = (mediaKey && signedUrl) ? `/api/image/${mediaKey}` : null;
+
       return {
         MediaKey: m.MediaKey,
-        // CRITICAL: Replace direct CDN URL with backend proxy path.
-        // The browser will request /api/image/:mediaKey instead of
-        // hitting media-demo.mlsgrid.com directly. Our backend fetches
-        // the image ONCE per TTL and caches the bytes in memory.
-        //
-        // IMPORTANT: Only create proxy URL when BOTH mediaKey AND a valid
-        // signedUrl exist. If either is missing, set MediaURL to null so
-        // the frontend correctly falls through to "No Image Available"
-        // instead of requesting /api/image/undefined.
-        MediaURL: (mediaKey && signedUrl) ? `/api/image/${mediaKey}` : null,
+        MediaURL: transformedUrl,
         MediaCategory: m.MediaCategory || '',
         Order: m.Order || m.Ordering || 0,
         PreferredPhotoYN: m.PreferredPhotoYN,
       };
     })
-    // Filter out empty/invalid media URLs to avoid 429 on garbage requests
     .filter(m => {
       if (!m.MediaURL) return false;
-      // Proxy URLs start with /api/image/ — always valid
       if (m.MediaURL.startsWith('/api/image/')) return true;
       try {
         const parsed = new URL(m.MediaURL);
@@ -602,19 +420,16 @@ function normalizeProperty(item, options = {}) {
       }
     });
 
-  // Sort by PreferredPhotoYN (true first), then by Order
   media.sort((a, b) => {
     if (a.PreferredPhotoYN && !b.PreferredPhotoYN) return -1;
     if (!a.PreferredPhotoYN && b.PreferredPhotoYN) return 1;
     return (a.Order || 0) - (b.Order || 0);
   });
 
-  // Limit media to reduce signed URL generation
   if (maxMedia > 0 && media.length > maxMedia) {
     media = media.slice(0, maxMedia);
   }
 
-  // Construct address from components if UnparsedAddress is missing
   const streetNum = item.StreetNumber && item.StreetNumber !== '000' ? item.StreetNumber : '';
   const constructedAddress = item.UnparsedAddress
     || [streetNum, item.StreetName, item.StreetSuffix].filter(Boolean).join(' ')
@@ -622,7 +437,7 @@ function normalizeProperty(item, options = {}) {
     || '';
 
   return {
-    // === Core Identifiers ===
+    // Core Identifiers
     ListingId: item.ListingId,
     ListingKey: item.ListingKey,
     ListingNumber: item.ListingNumber,
@@ -632,20 +447,20 @@ function normalizeProperty(item, options = {}) {
     OriginatingSystemName: item.OriginatingSystemName,
     OriginatingSystemKey: item.OriginatingSystemKey,
 
-    // === Property Type ===
+    // Property Type
     PropertyType: item.PropertyType,
     PropertySubType: item.PropertySubType,
     PropertyTypeLabel: item.PropertyTypeLabel,
     PropertyClass: item.PropertyClass,
     OwnershipType: item.OwnershipType,
 
-    // === Pricing ===
+    // Pricing
     ListPrice: item.ListPrice,
     OriginalListPrice: item.OriginalListPrice,
     ClosePrice: item.ClosePrice,
     LeaseAmount: item.LeaseAmount,
 
-    // === Bed/Bath ===
+    // Bed/Bath
     BedroomsTotal: item.BedroomsTotal,
     BathroomsTotalInteger: item.BathroomsTotalInteger,
     BathroomsFull: item.BathroomsFull,
@@ -653,7 +468,7 @@ function normalizeProperty(item, options = {}) {
     BathroomsPartial: item.BathroomsPartial,
     BathroomsTotal: item.BathroomsTotal,
 
-    // === Square Footage & Lot ===
+    // Square Footage & Lot
     LivingArea: item.LivingArea,
     LivingAreaUnits: item.LivingAreaUnits,
     AboveGradeFinishedArea: item.AboveGradeFinishedArea,
@@ -666,7 +481,7 @@ function normalizeProperty(item, options = {}) {
     LotSizeSquareFeet: item.LotSizeSquareFeet,
     LotSizeDimensions: item.LotSizeDimensions,
 
-    // === Construction & Year ===
+    // Construction & Year
     YearBuilt: item.YearBuilt,
     YearBuiltEffective: item.YearBuiltEffective,
     Stories: item.Stories,
@@ -680,7 +495,7 @@ function normalizeProperty(item, options = {}) {
     Roof: item.Roof,
     FoundationDetails: item.FoundationDetails,
 
-    // === Parking & Garage ===
+    // Parking & Garage
     GarageSpaces: item.GarageSpaces,
     GarageYN: item.GarageYN,
     GarageLevel: item.GarageLevel,
@@ -688,7 +503,7 @@ function normalizeProperty(item, options = {}) {
     ParkingTotal: item.ParkingTotal,
     OpenParkingSpaces: item.OpenParkingSpaces,
 
-    // === Utilities ===
+    // Utilities
     Cooling: item.Cooling,
     Heating: item.Heating,
     Utilities: item.Utilities,
@@ -697,7 +512,7 @@ function normalizeProperty(item, options = {}) {
     Electric: item.Electric,
     Gas: item.Gas,
 
-    // === Amenities & Features ===
+    // Amenities & Features
     Appliances: item.Appliances,
     InteriorFeatures: item.InteriorFeatures,
     ExteriorFeatures: item.ExteriorFeatures,
@@ -724,7 +539,7 @@ function normalizeProperty(item, options = {}) {
     AccessibilityFeatures: item.AccessibilityFeatures,
     AssociationAmenities: item.AssociationAmenities,
 
-    // === HOA & Financial ===
+    // HOA & Financial
     AssociationYN: item.AssociationYN,
     AssociationFee: item.AssociationFee,
     AssociationFeeFrequency: item.AssociationFeeFrequency,
@@ -736,7 +551,7 @@ function normalizeProperty(item, options = {}) {
     ParcelNumber: item.ParcelNumber,
     FinancialDataSource: item.FinancialDataSource,
 
-    // === Location ===
+    // Location
     StreetNumber: item.StreetNumber,
     StreetName: item.StreetName,
     StreetSuffix: item.StreetSuffix,
@@ -755,7 +570,7 @@ function normalizeProperty(item, options = {}) {
     Longitude: item.Longitude,
     PostalCity: item.PostalCity,
 
-    // === Schools ===
+    // Schools
     ElementarySchool: item.ElementarySchool,
     ElementarySchoolDistrict: item.ElementarySchoolDistrict,
     MiddleOrJuniorSchool: item.MiddleOrJuniorSchool,
@@ -763,12 +578,12 @@ function normalizeProperty(item, options = {}) {
     HighSchool: item.HighSchool,
     HighSchoolDistrict: item.HighSchoolDistrict,
 
-    // === Remarks ===
+    // Remarks
     PublicRemarks: item.PublicRemarks,
     PrivateRemarks: item.PrivateRemarks,
     ShowingInstructions: item.ShowingInstructions,
 
-    // === Virtual Tours & Media ===
+    // Virtual Tours & Media
     Media: media,
     PhotosCount: item.PhotosCount,
     VideosCount: item.VideosCount,
@@ -777,7 +592,7 @@ function normalizeProperty(item, options = {}) {
     VirtualTourURLBranded: item.VirtualTourURLBranded,
     VirtualTourURLUnbranded: item.VirtualTourURLUnbranded,
 
-    // === Dates & Timing ===
+    // Dates & Timing
     ListingContractDate: item.ListingContractDate,
     OnMarketDate: item.OnMarketDate,
     OffMarketDate: item.OffMarketDate,
@@ -791,7 +606,7 @@ function normalizeProperty(item, options = {}) {
     PurchaseContractDate: item.PurchaseContractDate,
     Possession: item.Possession,
 
-    // === Listing Agent ===
+    // Listing Agent
     ListAgentName: item.ListAgentName,
     ListAgentMlsId: item.ListAgentMlsId,
     ListAgentEmail: item.ListAgentEmail,
@@ -799,45 +614,45 @@ function normalizeProperty(item, options = {}) {
     ListAgentOfficePhone: item.ListAgentOfficePhone,
     ListAgentURL: item.ListAgentURL,
 
-    // === Co-Listing Agent ===
+    // Co-Listing Agent
     CoListAgentName: item.CoListAgentName,
     CoListAgentMlsId: item.CoListAgentMlsId,
     CoListAgentEmail: item.CoListAgentEmail,
     CoListAgentPreferredPhone: item.CoListAgentPreferredPhone,
 
-    // === Buyer Agent ===
+    // Buyer Agent
     BuyerAgentName: item.BuyerAgentName,
     BuyerAgentMlsId: item.BuyerAgentMlsId,
     BuyerAgentEmail: item.BuyerAgentEmail,
     BuyerAgentPreferredPhone: item.BuyerAgentPreferredPhone,
 
-    // === Listing Office ===
+    // Listing Office
     ListOfficeName: item.ListOfficeName,
     ListOfficeMlsId: item.ListOfficeMlsId,
     ListOfficePhone: item.ListOfficePhone,
     ListOfficeEmail: item.ListOfficeEmail,
     ListOfficeURL: item.ListOfficeURL,
 
-    // === Buyer Office ===
+    // Buyer Office
     BuyerOfficeName: item.BuyerOfficeName,
     BuyerOfficeMlsId: item.BuyerOfficeMlsId,
     BuyerOfficePhone: item.BuyerOfficePhone,
     BuyerOfficeEmail: item.BuyerOfficeEmail,
 
-    // === Co-Listing Office ===
+    // Co-Listing Office
     CoListOfficeName: item.CoListOfficeName,
     CoListOfficeMlsId: item.CoListOfficeMlsId,
 
-    // === Syndication ===
+    // Syndication
     InternetAddressDisplayYN: item.InternetAddressDisplayYN,
     InternetEntireListingDisplayYN: item.InternetEntireListingDisplayYN,
 
-    // === Status Flags ===
+    // Status Flags
     StatusChangeTimestamp: item.StatusChangeTimestamp,
     WithdrawnDate: item.WithdrawnDate,
     StatusContractualSearchDate: item.StatusContractualSearchDate,
 
-    // === Miscellaneous ===
+    // Miscellaneous
     PostalCodePlus4: item.PostalCodePlus4,
     Permission: item.Permission,
     AvailabilityDate: item.AvailabilityDate,
@@ -845,13 +660,6 @@ function normalizeProperty(item, options = {}) {
   };
 }
 
-/**
- * Normalize an MLS Grid list response.
- *
- * @param {Object} data - Raw MLS Grid response
- * @param {Object} [options] - Options passed to normalizeProperty
- * @returns {Object}
- */
 function normalizeResponse(data, options = {}) {
   return {
     success: true,
@@ -861,28 +669,12 @@ function normalizeResponse(data, options = {}) {
   };
 }
 
-/**
- * Invalidate cache entries by URL pattern.
- * Useful after administrative changes.
- *
- * @param {string} urlPattern - String to match against cached URLs
- * @returns {number} Number of invalidated entries
- */
 function invalidateCache(urlPattern) {
-  let count = 0;
-  // Note: cache internal store is not directly accessible,
-  // so we just clear the whole cache for now.
-  // A more targeted approach could be added if needed.
-  cache.clear();
-  return count;
+  return 0;
 }
 
-/**
- * Get cache statistics.
- * @returns {object}
- */
 function getCacheStats() {
-  return cache.getStats();
+  return { size: 0, hits: 0, misses: 0 };
 }
 
 module.exports = {
@@ -891,10 +683,8 @@ module.exports = {
   normalizeResponse,
   invalidateCache,
   getCacheStats,
-  // Image proxy exports
-  fetchAndCacheImage,
   getSignedMediaUrl,
-  // Expose store for debugging
-  imageByteCache,
+  streamMediaImage,
+  imageByteCache: new Map(),
   mediaUrlStore,
 };

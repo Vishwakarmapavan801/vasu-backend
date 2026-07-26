@@ -1,5 +1,7 @@
 const { Router } = require('express');
 const controller = require('../controllers/listingController');
+const statsController = require('../controllers/statsController');
+const mlsService = require('../services/mlsService');
 
 const router = Router();
 
@@ -30,8 +32,20 @@ router.get('/members', controller.getMembers);
 router.get('/offices', controller.getOffices);
 router.get('/open-houses', controller.getOpenHouses);
 router.get('/open-houses/listings', controller.getOpenHouseListings);
+router.get('/open-houses/property/:listingKey', controller.getPropertyOpenHouse);
+router.get('/properties/comps/:listingKey', controller.getComparableProperties);
 router.get('/lookup', controller.getLookupData);
 router.get('/media', controller.getMedia);
 router.get('/verify', controller.verifyConnection);
+// Debug: inspect internal image proxy cache state
+router.get('/debug/cache', (req, res) => {
+  res.json({
+    imageByteCacheSize: mlsService.imageByteCache?.size || 0,
+    mediaUrlStoreSize: mlsService.mediaUrlStore?.size || 0,
+    mediaUrlStoreKeys: Array.from((mlsService.mediaUrlStore || new Map()).keys()).slice(0, 20),
+  });
+});
+
+router.get('/company/stats', statsController.getCompanyStats);
 
 module.exports = router;

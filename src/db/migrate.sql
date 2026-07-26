@@ -18,10 +18,20 @@ CREATE TABLE IF NOT EXISTS contact_requests (
     phone           VARCHAR(50),
     subject         VARCHAR(255),
     message         TEXT NOT NULL,
+    inquiry_type    VARCHAR(100),
+    source          VARCHAR(255),
+    ip_address      VARCHAR(45),
+    user_agent      VARCHAR(500),
     status          VARCHAR(50) NOT NULL DEFAULT 'pending',
     created_at      TIMESTAMPTZ NOT NULL DEFAULT NOW(),
     updated_at      TIMESTAMPTZ NOT NULL DEFAULT NOW()
 );
+
+-- Add columns for existing databases that already have the table
+ALTER TABLE contact_requests ADD COLUMN IF NOT EXISTS inquiry_type VARCHAR(100);
+ALTER TABLE contact_requests ADD COLUMN IF NOT EXISTS source VARCHAR(255);
+ALTER TABLE contact_requests ADD COLUMN IF NOT EXISTS ip_address VARCHAR(45);
+ALTER TABLE contact_requests ADD COLUMN IF NOT EXISTS user_agent VARCHAR(500);
 
 CREATE INDEX idx_contact_requests_created_at ON contact_requests(created_at DESC);
 CREATE INDEX idx_contact_requests_status ON contact_requests(status);
@@ -217,6 +227,59 @@ CREATE INDEX idx_ai_demo_requests_created_at ON ai_demo_requests(created_at DESC
 -- ================================================================
 -- 11. ai_contact_requests - AI Contact us form
 -- ================================================================
+
+-- ================================================================
+-- 12. buyer_agent_requests - Dedicated buyer agent contact
+-- ================================================================
+CREATE TABLE IF NOT EXISTS buyer_agent_requests (
+    id              UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+    name            VARCHAR(255) NOT NULL,
+    email           VARCHAR(255) NOT NULL,
+    phone           VARCHAR(50) NOT NULL,
+    preferred_location VARCHAR(255),
+    budget_min      NUMERIC(12,2),
+    budget_max      NUMERIC(12,2),
+    property_type   VARCHAR(100),
+    bedrooms        INTEGER,
+    bathrooms       INTEGER,
+    timeline        VARCHAR(100),
+    additional_requirements TEXT,
+    status          VARCHAR(50) NOT NULL DEFAULT 'pending',
+    created_at      TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+    updated_at      TIMESTAMPTZ NOT NULL DEFAULT NOW()
+);
+
+CREATE INDEX idx_buyer_agent_requests_created_at ON buyer_agent_requests(created_at DESC);
+CREATE INDEX idx_buyer_agent_requests_status ON buyer_agent_requests(status);
+
+-- ================================================================
+-- 13. property_agent_inquiries - Contact Agent from specific property
+-- ================================================================
+CREATE TABLE IF NOT EXISTS property_agent_inquiries (
+    id                UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+    listing_key       VARCHAR(255),
+    listing_id        VARCHAR(255),
+    property_address  TEXT,
+    listing_price     NUMERIC(12,2),
+    property_url      TEXT,
+    listing_agent_name VARCHAR(255),
+    listing_agent_mls_id VARCHAR(255),
+    name              VARCHAR(255) NOT NULL,
+    email             VARCHAR(255) NOT NULL,
+    phone             VARCHAR(50),
+    message           TEXT,
+    status            VARCHAR(50) NOT NULL DEFAULT 'pending',
+    created_at        TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+    updated_at        TIMESTAMPTZ NOT NULL DEFAULT NOW()
+);
+
+CREATE INDEX idx_property_agent_inquiries_created_at ON property_agent_inquiries(created_at DESC);
+CREATE INDEX idx_property_agent_inquiries_status ON property_agent_inquiries(status);
+CREATE INDEX idx_property_agent_inquiries_listing_key ON property_agent_inquiries(listing_key);
+
+-- ================================================================
+-- 11. ai_contact_requests - AI Contact us form
+-- ================================================================
 CREATE TABLE IF NOT EXISTS ai_contact_requests (
     id                  UUID PRIMARY KEY DEFAULT gen_random_uuid(),
     voice_automation    VARCHAR(50),
@@ -275,6 +338,96 @@ END;
 $$;
 
 -- ================================================================
+-- 14. callback_requests - Agent callback requests
+-- ================================================================
+CREATE TABLE IF NOT EXISTS callback_requests (
+    id                UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+    name              VARCHAR(255) NOT NULL,
+    phone             VARCHAR(50) NOT NULL,
+    preferred_time    VARCHAR(50),
+    property_address  TEXT,
+    listing_key       VARCHAR(255),
+    status            VARCHAR(50) NOT NULL DEFAULT 'pending',
+    created_at        TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+    updated_at        TIMESTAMPTZ NOT NULL DEFAULT NOW()
+);
+
+CREATE INDEX idx_callback_requests_created_at ON callback_requests(created_at DESC);
+CREATE INDEX idx_callback_requests_status ON callback_requests(status);
+
+-- ================================================================
+-- 15. quick_questions - Property-specific quick questions
+-- ================================================================
+CREATE TABLE IF NOT EXISTS quick_questions (
+    id                UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+    name              VARCHAR(255) NOT NULL,
+    email             VARCHAR(255) NOT NULL,
+    phone             VARCHAR(50),
+    message           TEXT NOT NULL,
+    property_address  TEXT,
+    listing_key       VARCHAR(255),
+    listing_id        VARCHAR(255),
+    listing_price     NUMERIC(12,2),
+    status            VARCHAR(50) NOT NULL DEFAULT 'pending',
+    created_at        TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+    updated_at        TIMESTAMPTZ NOT NULL DEFAULT NOW()
+);
+
+CREATE INDEX idx_quick_questions_created_at ON quick_questions(created_at DESC);
+CREATE INDEX idx_quick_questions_status ON quick_questions(status);
+
+-- ================================================================
+-- 12. users - Registered user accounts for authentication
+-- ================================================================
+CREATE TABLE IF NOT EXISTS users (
+    id              UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+    email           VARCHAR(255) NOT NULL UNIQUE,
+    password_hash   VARCHAR(255) NOT NULL,
+    name            VARCHAR(255) NOT NULL,
+    phone           VARCHAR(50),
+    email_verified  BOOLEAN NOT NULL DEFAULT FALSE,
+    created_at      TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+    updated_at      TIMESTAMPTZ NOT NULL DEFAULT NOW()
+);
+
+CREATE UNIQUE INDEX IF NOT EXISTS idx_users_email ON users(email);
+CREATE INDEX IF NOT EXISTS idx_users_created_at ON users(created_at DESC);
+
+-- ================================================================
+-- 13. favorites - User saved/favorited properties
+-- ================================================================
+CREATE TABLE IF NOT EXISTS favorites (
+    id              UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+    user_id         UUID NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+    listing_key     VARCHAR(255) NOT NULL,
+    property_data   JSONB,  -- Cached property snapshot for fast display
+    created_at      TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+    -- Prevent duplicate favorites
+    UNIQUE(user_id, listing_key)
+);
+
+CREATE INDEX IF NOT EXISTS idx_favorites_user_id ON favorites(user_id);
+CREATE INDEX IF NOT EXISTS idx_favorites_listing_key ON favorites(listing_key);
+CREATE INDEX IF NOT EXISTS idx_favorites_created_at ON favorites(created_at DESC);
+
+-- Add users and favorites to the trigger update list
+DO $$
+BEGIN
+    -- Users trigger
+    BEGIN
+        CREATE TRIGGER update_users_updated_at BEFORE UPDATE ON users FOR EACH ROW EXECUTE FUNCTION update_updated_at_column();
+    EXCEPTION WHEN duplicate_object THEN NULL;
+    END;
+    
+    -- Favorites trigger (no updated_at needed, but keep for consistency)
+    BEGIN
+        CREATE TRIGGER update_favorites_updated_at BEFORE UPDATE ON favorites FOR EACH ROW EXECUTE FUNCTION update_updated_at_column();
+    EXCEPTION WHEN duplicate_object THEN NULL;
+    END;
+END;
+$$;
+
+-- ================================================================
 -- Verify all tables were created
 -- ================================================================
 SELECT table_name, table_type
@@ -291,6 +444,8 @@ AND table_name IN (
     'mortgage_pre_approvals',
     'seller_requests',
     'ai_demo_requests',
-    'ai_contact_requests'
+    'ai_contact_requests',
+    'users',
+    'favorites'
 )
 ORDER BY table_name;

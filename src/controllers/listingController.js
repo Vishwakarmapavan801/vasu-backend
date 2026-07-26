@@ -28,7 +28,8 @@ async function getListingById(req, res, next) {
   try {
     // Support both /properties/:id (via req.params.id) and /properties/listing/:listingId
     const listingId = req.params.listingId || req.params.id;
-    const result = await propertyService.getPropertyById(listingId);
+    // Use getAllMedia variant for detail pages so MLS provides all images
+    const result = await propertyService.getPropertyByIdWithAllMedia(listingId);
 
     if (!result) {
       return res.status(404).json({
@@ -217,7 +218,7 @@ async function getCityListings(req, res, next) {
 
     // Validate city name
     const supportedCities = ['charlotte', 'waxhaw', 'concord', 'gastonia', 'rock hill', 'fort mill', 'tega cay'];
-    const cityLower = city.toLowerCase().trim();
+    const cityLower = city.toLowerCase().trim().replace(/-/g, ' ');
     const isValid = supportedCities.some(c => c === cityLower);
     if (!isValid) {
       return res.status(404).json({
@@ -238,59 +239,59 @@ async function getCityListings(req, res, next) {
 }
 
 /**
- * Serve a media image via backend proxy.
+ * Serve a media image via backend streaming proxy.
  *
- * Instead of sending the browser directly to media-demo.mlsgrid.com
- * (which rate-limits aggressively), the backend fetches the image
- * ONCE per TTL period using the signed URL stored in mediaUrlStore,
- * caches the bytes in memory, and serves them to all subsequent
- * browser requests.
- *
- * Response includes Cache-Control headers so browsers and CDNs
- * cache the response for 10 minutes.
+ * Streams image data from MLS CDN directly to the browser response
+ * without buffering the entire image in memory. Implements:
+ *  - Memory cache (instant serve)
+ *  - Disk cache (survives server restart)
+ *  - Automatic MediaURL refresh on 403
+ *  - Graceful client disconnect handling
+ *  - KeepAlive connection reuse
+ *  - Concurrency limiting (max 3 simultaneous CDN streams)
  */
 async function serveMediaImage(req, res, next) {
   const { mediaKey } = req.params;
-  console.log(`[ImageProxy] Request received for mediaKey: ${mediaKey}`);
+  const startTime = Date.now();
 
   try {
     if (!mediaKey) {
       return res.status(400).json({ success: false, error: 'Media key required' });
     }
 
-    const { buffer, contentType } = await mlsService.fetchAndCacheImage(mediaKey);
+    await mlsService.streamMediaImage(mediaKey, req, res);
 
-    res.set('Content-Type', contentType);
-    res.set('Content-Length', buffer.length);
-    res.set('Cache-Control', 'public, max-age=600, immutable');
-    res.set('X-Proxy-Cache', 'MLS-Grid-Image-Proxy');
-
-    console.log(`[ImageProxy] Served ${mediaKey} (${(buffer.length / 1024).toFixed(1)} KB)`);
-    return res.end(buffer);
+    const elapsed = Date.now() - startTime;
+    console.log(`[ImageProxy] Served ${mediaKey} in ${elapsed}ms`);
   } catch (err) {
+    const elapsed = Date.now() - startTime;
     const msg = err.message || '';
-    if (msg.includes('not found or expired') || msg.includes('not found in MLS')) {
-      console.warn(`[ImageProxy] Media not found: ${mediaKey} — ${msg}`);
-      return res.status(404).json({ success: false, error: 'Media not found or expired' });
+    const statusCode = err.response?.status || 0;
+
+    console.error(`[ImageProxy] ERROR ${mediaKey} (${elapsed}ms): ${msg}`);
+
+    if (res.headersSent) {
+      res.end();
+      return;
+    }
+
+    if (msg.includes('not found in MLS') || msg.includes('Media key not found')) {
+      return res.status(404).json({ success: false, error: 'Media not found' });
     }
     if (msg.includes('timeout') || msg.includes('ETIMEDOUT') || msg.includes('ECONNABORTED')) {
-      console.warn(`[ImageProxy] CDN timeout for ${mediaKey}: ${msg}`);
       res.set('Content-Type', 'image/svg+xml');
       res.set('Cache-Control', 'public, max-age=300');
       return res.end('<svg xmlns="http://www.w3.org/2000/svg" width="1" height="1"/>');
     }
     if (msg.includes('429') || msg.includes('rate limit')) {
-      console.warn(`[ImageProxy] CDN rate limited for ${mediaKey}: ${msg}`);
       res.set('Content-Type', 'image/svg+xml');
       res.set('Cache-Control', 'public, max-age=300');
       return res.end('<svg xmlns="http://www.w3.org/2000/svg" width="1" height="1"/>');
     }
-    console.error(`[ImageProxy] Failed to fetch image ${mediaKey}:`, msg);
-    // Return a transparent SVG pixel so the browser never shows a broken image icon.
-    // The error is still logged server-side for debugging.
+
     res.set('Content-Type', 'image/svg+xml');
     res.set('Cache-Control', 'public, max-age=300');
-    return res.end('<svg xmlns="http://www.w3.org/2000/svg" width="1" height="1"/>');
+    res.end('<svg xmlns="http://www.w3.org/2000/svg" width="1" height="1"/>');
   }
 }
 
@@ -324,6 +325,41 @@ async function getCities(req, res, next) {
   }
 }
 
+/**
+ * Get Open Houses for a specific property by ListingKey.
+ * Queries MLS OpenHouse resource filtered by the property's ListingKey.
+ * Returns hasOpenHouse, upcoming dates, times, and status.
+ */
+async function getPropertyOpenHouse(req, res, next) {
+  try {
+    const { listingKey } = req.params;
+    if (!listingKey) {
+      return res.status(400).json({ success: false, error: 'ListingKey parameter required' });
+    }
+    const result = await propertyService.getOpenHousesByProperty(listingKey);
+    return res.json(result);
+  } catch (err) {
+    next(err);
+  }
+}
+
+/**
+ * Get comparable properties for a listing.
+ * Fetches real MLS properties in the same ZIP/city with similar characteristics.
+ */
+async function getComparableProperties(req, res, next) {
+  try {
+    const { listingKey } = req.params;
+    if (!listingKey) {
+      return res.status(400).json({ success: false, error: 'ListingKey parameter required' });
+    }
+    const result = await propertyService.getComparableProperties(listingKey);
+    return res.json(result);
+  } catch (err) {
+    next(err);
+  }
+}
+
 module.exports = {
   getListings,
   getFeaturedListings,
@@ -342,6 +378,8 @@ module.exports = {
   getOffices,
   getOpenHouses,
   getOpenHouseListings,
+  getPropertyOpenHouse,
+  getComparableProperties,
   getLookupData,
   getMedia,
   verifyConnection,

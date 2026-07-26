@@ -330,8 +330,10 @@ function isPreciseFilter(mlsFilters) {
 function getFetchLimit(requestedTop) {
   // For local filtering, fetch more than requested to ensure we have enough
   // after filtering. Cap at 500 to cover most city result sets.
+  // Increased multiplier from 3 to 10 to reliably find smaller-city listings
+  // like Concord, Gastonia, Rock Hill within a broader metro-area fetch.
   const minimum = Math.max(requestedTop || 20, 20);
-  return Math.min(minimum * 3, 500);
+  return Math.min(minimum * 10, 500);
 }
 
 module.exports = {

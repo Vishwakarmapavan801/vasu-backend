@@ -7,12 +7,33 @@
  */
 
 const formService = require('../services/formService');
+const emailService = require('../services/emailService');
+
+/** Name regex (letters, spaces, hyphens, apostrophes only) */
+const NAME_RE = /^[A-Za-zÀ-ÖØ-öø-ÿ\s'-]+$/;
 
 /** Simple email regex */
 const EMAIL_RE = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
 
 /** Simple phone regex (accepts digits, spaces, dashes, parens, dots, +) */
 const PHONE_RE = /^[\d\s\-().+]{7,20}$/;
+
+/**
+ * Strip HTML tags and trim.
+ */
+function stripHtml(val) {
+  if (typeof val !== 'string') return '';
+  return val.replace(/<[^>]*>/g, '').trim();
+}
+
+/**
+ * Get client IP from request (handles proxies).
+ */
+function getClientIp(req) {
+  const forwarded = req.headers['x-forwarded-for'];
+  if (forwarded) return forwarded.split(',')[0].trim();
+  return req.ip || req.socket?.remoteAddress || '';
+}
 
 /**
  * Validate required string field.
@@ -25,6 +46,16 @@ function requiredString(val, fieldName, maxLen = 500) {
   if (val.trim().length > maxLen) {
     return `${fieldName} must be ${maxLen} characters or less`;
   }
+  return null;
+}
+
+/**
+ * Validate name field (letters, spaces, hyphens, apostrophes only).
+ */
+function validateName(val) {
+  if (!val || !val.trim()) return 'Name is required';
+  const cleaned = stripHtml(val);
+  if (!NAME_RE.test(cleaned)) return 'Name can only contain letters, spaces, hyphens, and apostrophes';
   return null;
 }
 
@@ -71,10 +102,15 @@ function createdResponse(res, record, message) {
 /**
  * Generic async handler wrapper for try/catch.
  */
-async function handleInsert(req, res, next, serviceFn, extractData, successMsg) {
+async function handleInsert(req, res, next, serviceFn, extractData, successMsg, afterInsert) {
   try {
     const data = extractData(req.body);
     const record = await serviceFn(data);
+    // Fire-and-forget: execute post-insert callback (e.g., email notification)
+    // without blocking the response. Failures are logged by the callback.
+    if (typeof afterInsert === 'function') {
+      afterInsert(record, data).catch(() => {});
+    }
     return createdResponse(res, record, successMsg);
   } catch (err) {
     // Handle unique constraint violations (e.g., duplicate email)
@@ -93,10 +129,19 @@ async function handleInsert(req, res, next, serviceFn, extractData, successMsg) 
 // POST /api/contact
 // ================================================================
 async function submitContact(req, res, next) {
-  const { name, email, phone, subject, message } = req.body;
+  const raw = req.body || {};
+  const name = stripHtml(raw.name || '');
+  const email = (raw.email || '').trim().toLowerCase();
+  const phone = stripHtml(raw.phone || '');
+  const subject = stripHtml(raw.subject || '');
+  const message = stripHtml(raw.message || '');
+  const inquiry_type = stripHtml(raw.inquiry_type || '') || subject || null;
+  const source = stripHtml(raw.source || '') || 'website';
+  const ip_address = getClientIp(req);
+  const user_agent = (req.headers['user-agent'] || '').slice(0, 500);
   const errors = {};
 
-  const nameErr = requiredString(name, 'Name');
+  const nameErr = validateName(name);
   if (nameErr) errors.name = nameErr;
 
   const emailErr = validateEmail(email);
@@ -105,16 +150,18 @@ async function submitContact(req, res, next) {
   const phoneErr = validatePhone(phone);
   if (phoneErr) errors.phone = phoneErr;
 
+  if (subject && subject.length > 255) errors.subject = 'Subject must be 255 characters or less';
   const msgErr = requiredString(message, 'Message', 5000);
   if (msgErr) errors.message = msgErr;
 
   if (Object.keys(errors).length) return validationError(res, errors);
 
   return handleInsert(req, res, next, formService.createContactRequest, () => ({
-    name: name.trim(), email: email.trim().toLowerCase(),
-    phone: (phone || '').trim(), subject: (subject || '').trim(),
-    message: message.trim(),
-  }), 'Your message has been sent. We will respond within 24 hours.');
+    name, email, phone, subject, message, inquiry_type, source, ip_address, user_agent,
+  }), 'Your message has been sent. We will respond within 24 hours.',
+  (record, data) => {
+    emailService.sendGeneralContactNotification(data).catch(() => {});
+  });
 }
 
 // ================================================================
@@ -124,11 +171,14 @@ async function submitTour(req, res, next) {
   const { propertyId, listingKey, propertyAddress, name, email, phone, message, preferredDate, preferredTime } = req.body;
   const errors = {};
 
-  const nameErr = requiredString(name, 'Name');
+  const nameErr = validateName(name);
   if (nameErr) errors.name = nameErr;
 
   const emailErr = validateEmail(email);
   if (emailErr) errors.email = emailErr;
+
+  const phoneErr = validatePhone(phone);
+  if (phoneErr) errors.phone = phoneErr;
 
   if (Object.keys(errors).length) return validationError(res, errors);
 
@@ -150,10 +200,12 @@ async function submitPropertyInquiry(req, res, next) {
   const { propertyId, listingKey, propertyAddress, name, email, phone, message } = req.body;
   const errors = {};
 
-  const nameErr = requiredString(name, 'Name');
+  const nameErr = validateName(name);
   if (nameErr) errors.name = nameErr;
   const emailErr = validateEmail(email);
   if (emailErr) errors.email = emailErr;
+  const phoneErr = validatePhone(phone);
+  if (phoneErr) errors.phone = phoneErr;
 
   if (Object.keys(errors).length) return validationError(res, errors);
 
@@ -172,11 +224,11 @@ async function submitHomeValuation(req, res, next) {
   const { name, email, phone, propertyAddress, message } = req.body;
   const errors = {};
 
-  const nameErr = requiredString(name, 'Name');
+  const nameErr = validateName(name);
   if (nameErr) errors.name = nameErr;
   const emailErr = validateEmail(email);
   if (emailErr) errors.email = emailErr;
-  const phoneErr = requiredString(phone, 'Phone');
+  const phoneErr = validatePhone(phone, true);
   if (phoneErr) errors.phone = phoneErr;
   const addrErr = requiredString(propertyAddress, 'Property Address');
   if (addrErr) errors.propertyAddress = addrErr;
@@ -212,11 +264,11 @@ async function submitCareerApplication(req, res, next) {
   const { fullName, email, phone, position, experience, coverLetter, linkedinProfile, portfolioUrl, resumeData, resumeFilename, resumeContentType } = req.body;
   const errors = {};
 
-  const nameErr = requiredString(fullName, 'Full Name');
+  const nameErr = validateName(fullName);
   if (nameErr) errors.fullName = nameErr;
   const emailErr = validateEmail(email);
   if (emailErr) errors.email = emailErr;
-  const phoneErr = requiredString(phone, 'Phone');
+  const phoneErr = validatePhone(phone, true);
   if (phoneErr) errors.phone = phoneErr;
   const posErr = requiredString(position, 'Position');
   if (posErr) errors.position = posErr;
@@ -255,10 +307,12 @@ async function submitOnboarding(req, res, next) {
   const { fullName, email, phone, address, govtIdType, attachments } = req.body;
   const errors = {};
 
-  const nameErr = requiredString(fullName, 'Full Name');
+  const nameErr = validateName(fullName);
   if (nameErr) errors.fullName = nameErr;
   const emailErr = validateEmail(email);
   if (emailErr) errors.email = emailErr;
+  const phoneErr = validatePhone(phone);
+  if (phoneErr) errors.phone = phoneErr;
 
   if (Object.keys(errors).length) return validationError(res, errors);
 
@@ -277,11 +331,11 @@ async function submitPreApproval(req, res, next) {
   const { fullName, email, phone, propertyPrice, downPayment, annualIncome, employmentStatus, creditScore, preferredLoanTerm, notes } = req.body;
   const errors = {};
 
-  const nameErr = requiredString(fullName, 'Full Name');
+  const nameErr = validateName(fullName);
   if (nameErr) errors.fullName = nameErr;
   const emailErr = validateEmail(email);
   if (emailErr) errors.email = emailErr;
-  const phoneErr = requiredString(phone, 'Phone');
+  const phoneErr = validatePhone(phone, true);
   if (phoneErr) errors.phone = phoneErr;
 
   if (!propertyPrice || Number(propertyPrice) <= 0) errors.propertyPrice = 'Property price must be greater than 0';
@@ -308,10 +362,12 @@ async function submitSellerRequest(req, res, next) {
   const { name, email, phone, propertyAddress, message, role } = req.body;
   const errors = {};
 
-  const nameErr = requiredString(name, 'Name');
+  const nameErr = validateName(name);
   if (nameErr) errors.name = nameErr;
   const emailErr = validateEmail(email);
   if (emailErr) errors.email = emailErr;
+  const phoneErr = validatePhone(phone);
+  if (phoneErr) errors.phone = phoneErr;
 
   if (Object.keys(errors).length) return validationError(res, errors);
 
@@ -329,7 +385,7 @@ async function submitAIDemo(req, res, next) {
   const { name, email, companyName, industry, findUs, whatsappNumber, phoneNumber } = req.body;
   const errors = {};
 
-  const nameErr = requiredString(name, 'Name');
+  const nameErr = validateName(name);
   if (nameErr) errors.name = nameErr;
   const emailErr = validateEmail(email);
   if (emailErr) errors.email = emailErr;
@@ -339,9 +395,11 @@ async function submitAIDemo(req, res, next) {
   if (industryErr) errors.industry = industryErr;
   const findUsErr = requiredString(findUs, 'How did you find us');
   if (findUsErr) errors.findUs = findUsErr;
-  const waErr = requiredString(whatsappNumber, 'WhatsApp Number');
+
+  // Validate phone numbers with content-aware patterns (WhatsApp numbers may include +)
+  const waErr = validatePhone(whatsappNumber, true);
   if (waErr) errors.whatsappNumber = waErr;
-  const phoneErr = requiredString(phoneNumber, 'Phone Number');
+  const phoneErr = validatePhone(phoneNumber, true);
   if (phoneErr) errors.phoneNumber = phoneErr;
 
   if (Object.keys(errors).length) return validationError(res, errors);
@@ -376,6 +434,126 @@ async function submitAIContact(req, res, next) {
   return handleInsert(req, res, next, formService.createAIContactRequest, () => data, 'AI contact request submitted successfully.');
 }
 
+// ================================================================
+// POST /api/buyer-agent
+// ================================================================
+async function submitBuyerAgentRequest(req, res, next) {
+  const { name, email, phone, preferredLocation, budgetMin, budgetMax, propertyType, bedrooms, bathrooms, timeline, additionalRequirements } = req.body;
+  const errors = {};
+
+  const nameErr = validateName(name);
+  if (nameErr) errors.name = nameErr;
+  const emailErr = validateEmail(email);
+  if (emailErr) errors.email = emailErr;
+  const phoneErr = validatePhone(phone);
+  if (phoneErr) errors.phone = phoneErr;
+
+  // budget range validation
+  if (budgetMin !== undefined && budgetMin !== null && budgetMax !== undefined && budgetMax !== null) {
+    if (Number(budgetMin) > Number(budgetMax)) {
+      errors.budget = 'Minimum budget cannot exceed maximum budget';
+    }
+  }
+
+  if (Object.keys(errors).length) return validationError(res, errors);
+
+  const buyerData = {
+    name: name.trim(), email: email.trim().toLowerCase(),
+    phone: phone.trim(),
+    preferredLocation: (preferredLocation || '').trim(),
+    budgetMin: budgetMin !== undefined && budgetMin !== null && budgetMin !== '' ? Number(budgetMin) : null,
+    budgetMax: budgetMax !== undefined && budgetMax !== null && budgetMax !== '' ? Number(budgetMax) : null,
+    propertyType: (propertyType || '').trim(),
+    bedrooms: bedrooms !== undefined && bedrooms !== null && bedrooms !== '' ? Number(bedrooms) : null,
+    bathrooms: bathrooms !== undefined && bathrooms !== null && bathrooms !== '' ? Number(bathrooms) : null,
+    timeline: (timeline || '').trim(),
+    additionalRequirements: (additionalRequirements || '').trim(),
+  };
+  return handleInsert(req, res, next, formService.createBuyerAgentRequest, () => buyerData,
+    'Your buyer agent request has been submitted. A dedicated agent will contact you within 24 hours.',
+    (record, data) => {
+      emailService.sendBuyerAgentNotification(data).catch(() => {});
+    });
+}
+
+// ================================================================
+// POST /api/property-agent-inquiry
+// ================================================================
+async function submitPropertyAgentInquiry(req, res, next) {
+  const { listingKey, listingId, propertyAddress, listingPrice, propertyUrl, listingAgentName, listingAgentMlsId, name, email, phone, message } = req.body;
+  const errors = {};
+
+  const nameErr = validateName(name);
+  if (nameErr) errors.name = nameErr;
+  const emailErr = validateEmail(email);
+  if (emailErr) errors.email = emailErr;
+  const phoneErr = validatePhone(phone);
+  if (phoneErr) errors.phone = phoneErr;
+
+  if (Object.keys(errors).length) return validationError(res, errors);
+
+  const agentData = {
+    listingKey: (listingKey || '').trim(),
+    listingId: (listingId || '').trim(),
+    propertyAddress: (propertyAddress || '').trim(),
+    listingPrice: listingPrice !== undefined && listingPrice !== null ? Number(listingPrice) : null,
+    propertyUrl: (propertyUrl || '').trim(),
+    listingAgentName: (listingAgentName || '').trim(),
+    listingAgentMlsId: (listingAgentMlsId || '').trim(),
+    name: name.trim(), email: email.trim().toLowerCase(),
+    phone: phone.trim(), message: (message || '').trim(),
+  };
+  return handleInsert(req, res, next, formService.createPropertyAgentInquiry, () => agentData,
+    'Your inquiry has been sent to the listing agent.',
+    (record, data) => {
+      emailService.sendPropertyAgentNotification(data).catch(() => {});
+    });
+}
+
+// ================================================================
+// POST /api/request-callback
+// ================================================================
+async function submitCallbackRequest(req, res, next) {
+  const { name, phone, preferredTime, propertyAddress, listingKey } = req.body;
+  const errors = {};
+  const nameErr = validateName(name);
+  if (nameErr) errors.name = nameErr;
+  const phoneErr = validatePhone(phone);
+  if (phoneErr) errors.phone = phoneErr;
+  if (Object.keys(errors).length) return validationError(res, errors);
+
+  return handleInsert(req, res, next, formService.createCallbackRequest, () => ({
+    name: name.trim(), phone: phone.trim(),
+    preferredTime: (preferredTime || '').trim(),
+    propertyAddress: (propertyAddress || '').trim(),
+    listingKey: (listingKey || '').trim(),
+  }), 'Callback request submitted.');
+}
+
+// ================================================================
+// POST /api/quick-question
+// ================================================================
+async function submitQuickQuestion(req, res, next) {
+  const { name, email, phone, message, propertyAddress, listingKey, listingId, listingPrice } = req.body;
+  const errors = {};
+  const nameErr = validateName(name);
+  if (nameErr) errors.name = nameErr;
+  const emailErr = validateEmail(email);
+  if (emailErr) errors.email = emailErr;
+  const msgErr = requiredString(message, 'Message', 5000);
+  if (msgErr) errors.message = msgErr;
+  if (Object.keys(errors).length) return validationError(res, errors);
+
+  return handleInsert(req, res, next, formService.createQuickQuestion, () => ({
+    name: name.trim(), email: email.trim().toLowerCase(),
+    phone: (phone || '').trim(), message: message.trim(),
+    propertyAddress: (propertyAddress || '').trim(),
+    listingKey: (listingKey || '').trim(),
+    listingId: (listingId || '').trim(),
+    listingPrice: listingPrice ? Number(listingPrice) : null,
+  }), 'Your question has been submitted. We will respond within 24 hours.');
+}
+
 module.exports = {
   submitContact,
   submitTour,
@@ -388,4 +566,8 @@ module.exports = {
   submitSellerRequest,
   submitAIDemo,
   submitAIContact,
+  submitBuyerAgentRequest,
+  submitPropertyAgentInquiry,
+  submitCallbackRequest,
+  submitQuickQuestion,
 };

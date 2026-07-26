@@ -125,9 +125,19 @@
 
 
 
-
-
 require('dotenv').config();
+
+const dns = require('dns');
+
+// ============================================================
+// DNS Configuration
+// Fixes "getaddrinfo ENOTFOUND" / "getaddrinfo ECONNREFUSED" errors
+// that occur when Node.js cannot reach the system's DNS server.
+// System DNS is refusing connections on this machine; use Google
+// Public DNS as a reliable fallback for all outbound requests.
+// See: https://nodejs.org/api/dns.html#dnssetserversservers
+// ============================================================
+dns.setServers(['8.8.8.8', '8.8.4.4', '1.1.1.1']);
 
 const express = require('express');
 const cors = require('cors');
@@ -141,34 +151,87 @@ const pool = require('./config/database');
 // Configuration & Middlewares
 const { PORT, CLIENT_URL } = require('./config');
 const { errorHandler, notFoundHandler } = require('./middleware/errorHandler');
+const compression = require('./middleware/compression');
 
 // Routes
 const mlsRoutes = require('./routes/mls');
 const preApprovalRoutes = require('./routes/preApproval');
 const formRoutes = require('./routes/formRoutes');
+const authRoutes = require('./routes/auth');
+const favoritesRoutes = require('./routes/favorites');
 const app = express();
+
+const allowedOrigins = new Set([
+  CLIENT_URL,
+  'http://localhost:5173',
+  'http://127.0.0.1:5173',
+  'http://localhost:5174',
+  'http://127.0.0.1:5174',
+  'http://localhost:3000',
+  'http://127.0.0.1:3000',
+  'http://localhost:5000',
+  'http://127.0.0.1:5000',
+].filter(Boolean));
+
+if (process.env.CORS_ALLOWED_ORIGINS) {
+  process.env.CORS_ALLOWED_ORIGINS.split(',').map((origin) => origin.trim()).filter(Boolean).forEach((origin) => allowedOrigins.add(origin));
+}
+
+const corsOptions = {
+  origin(origin, callback) {
+    if (!origin) return callback(null, true);
+    const normalizedOrigin = origin.replace(/\/$/, '');
+    const isLocalhost = /^https?:\/\/(localhost|127\.0\.0\.1)(:\d+)?$/.test(normalizedOrigin);
+    if (allowedOrigins.has(normalizedOrigin) || isLocalhost) {
+      return callback(null, true);
+    }
+    return callback(null, false);
+  },
+  credentials: true,
+  methods: ['GET', 'POST', 'PUT', 'PATCH', 'DELETE', 'OPTIONS'],
+  allowedHeaders: ['Content-Type', 'Authorization', 'X-Requested-With'],
+};
 
 // ============================================================
 // Core Middlewares
 // ============================================================
+app.use(compression);
 app.use(helmet());
-app.use(cors({
-  origin: [CLIENT_URL, 'http://localhost:5173', 'http://127.0.0.1:5173', 'http://localhost:3000'].filter(Boolean),
-  credentials: true,
-}));
+app.use(cors(corsOptions));
 app.use(express.json({ limit: '10mb' }));
 app.use(express.urlencoded({ extended: true }));
-app.use(morgan('dev'));
+
+// Only use morgan logging in development mode
+if (process.env.NODE_ENV === 'development') {
+  app.use(morgan('dev'));
+}
 
 // Rate Limiter for API Endpoints
-const limiter = rateLimit({
+// Image proxy routes (/api/image/*) are EXEMPT from rate limiting because:
+// - A single page load with 24+ property cards triggers 24+ simultaneous image requests
+// - Images are served from memory/disk cache in ~1ms — no server load concern
+// - Rate limiting them would break the property browsing experience
+// Higher rate limit to prevent blocking legitimate property browsing
+// Property search pages make 2-4 API calls per load
+const apiLimiter = rateLimit({
   windowMs: 15 * 60 * 1000,
-  max: 100,
+  max: 300,
   standardHeaders: true,
   legacyHeaders: false,
   message: { success: false, error: 'Too many requests, please try again later.' },
 });
-app.use('/api/', limiter);
+
+app.use('/api/', (req, res, next) => {
+  // Image proxy routes are completely exempt from rate limiting
+  if (req.path.startsWith('/image/')) {
+    return next();
+  }
+  // Health/debug endpoints exempt
+  if (req.path === '/health' || req.path === '/debug' || req.path === '/db-check') {
+    return next();
+  }
+  return apiLimiter(req, res, next);
+});
 
 // ============================================================
 // Cache-Control Headers for MLS Grid API Responses
@@ -227,6 +290,16 @@ app.use('/api', formRoutes);
 // New submissions go through formRoutes (/api/pre-approval) and are stored in PostgreSQL
 app.use('/api/pre-approval', preApprovalRoutes);
 
+// Authentication routes (register, login, logout, me)
+app.use('/api/auth', authRoutes);
+
+// Favorites routes (CRUD for saved properties)
+app.use('/api/favorites', favoritesRoutes);
+
+// AI Chat routes (OpenAI-powered property search)
+const aiRoutes = require('./routes/ai');
+app.use('/api/ai', aiRoutes);
+
 // 404 handler
 app.use('/api', notFoundHandler);
 app.use(errorHandler);
@@ -235,11 +308,15 @@ app.use(errorHandler);
 const serverPort = PORT || process.env.PORT || 5000;
 
 app.listen(serverPort, () => {
+  const dbHost = process.env.DB_HOST || 'not set';
+  const dbName = process.env.DB_NAME || 'not set';
   console.log(`\n  Vasu Realty MLS API Server`);
   console.log(`  ─────────────────────────`);
   console.log(`  Environment : ${process.env.NODE_ENV || 'development'}`);
   console.log(`  Port        : ${serverPort}`);
-  console.log(`  MLS Grid    : ${process.env.MLS_GRID_BASE_URL}`);
+  console.log(`  MLS Grid    : ${process.env.MLS_GRID_BASE_URL || 'not set'}`);
+  console.log(`  Database    : ${dbName}`);
+  console.log(`  Host        : ${dbHost}`);
   console.log(`  CORS Origin : ${CLIENT_URL}`);
   console.log(`  ─────────────────────────`);
   console.log(`  Server running at http://localhost:${serverPort}\n`);

@@ -25,8 +25,8 @@ async function insertRow(table, data) {
 // ================================================================
 // Contact Requests
 // ================================================================
-async function createContactRequest({ name, email, phone, subject, message }) {
-  return insertRow('contact_requests', { name, email, phone, subject, message });
+async function createContactRequest({ name, email, phone, subject, message, inquiry_type, source, ip_address, user_agent }) {
+  return insertRow('contact_requests', { name, email, phone, subject, message, inquiry_type, source, ip_address, user_agent });
 }
 
 // ================================================================
@@ -172,6 +172,66 @@ async function createAIContactRequest(data) {
   });
 }
 
+// ================================================================
+// Buyer Agent Requests
+// ================================================================
+async function createBuyerAgentRequest({ name, email, phone, preferredLocation, budgetMin, budgetMax, propertyType, bedrooms, bathrooms, timeline, additionalRequirements }) {
+  return insertRow('buyer_agent_requests', {
+    name, email, phone,
+    preferred_location: preferredLocation || null,
+    budget_min: budgetMin || null,
+    budget_max: budgetMax || null,
+    property_type: propertyType || null,
+    bedrooms: bedrooms || null,
+    bathrooms: bathrooms || null,
+    timeline: timeline || null,
+    additional_requirements: additionalRequirements || null,
+  });
+}
+
+// ================================================================
+// Property Agent Inquiries (Contact Agent from property)
+// ================================================================
+async function createPropertyAgentInquiry({ listingKey, listingId, propertyAddress, listingPrice, propertyUrl, listingAgentName, listingAgentMlsId, name, email, phone, message }) {
+  return insertRow('property_agent_inquiries', {
+    listing_key: listingKey || null,
+    listing_id: listingId || null,
+    property_address: propertyAddress || null,
+    listing_price: listingPrice || null,
+    property_url: propertyUrl || null,
+    listing_agent_name: listingAgentName || null,
+    listing_agent_mls_id: listingAgentMlsId || null,
+    name, email, phone: phone || null,
+    message: message || null,
+  });
+}
+
+// ================================================================
+// Callback Requests
+// ================================================================
+async function createCallbackRequest({ name, phone, preferredTime, propertyAddress, listingKey }) {
+  return insertRow('callback_requests', {
+    name, phone,
+    preferred_time: preferredTime || null,
+    property_address: propertyAddress || null,
+    listing_key: listingKey || null,
+  });
+}
+
+// ================================================================
+// Quick Questions
+// ================================================================
+async function createQuickQuestion({ name, email, phone, message, propertyAddress, listingKey, listingId, listingPrice }) {
+  return insertRow('quick_questions', {
+    name, email, phone: phone || null,
+    message,
+    property_address: propertyAddress || null,
+    listing_key: listingKey || null,
+    listing_id: listingId || null,
+    listing_price: listingPrice || null,
+  });
+}
+
 module.exports = {
   createContactRequest,
   createTourRequest,
@@ -184,4 +244,8 @@ module.exports = {
   createSellerRequest,
   createAIDemoRequest,
   createAIContactRequest,
+  createBuyerAgentRequest,
+  createPropertyAgentInquiry,
+  createCallbackRequest,
+  createQuickQuestion,
 };

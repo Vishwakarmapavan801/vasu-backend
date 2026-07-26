@@ -20,7 +20,8 @@ const {
   getFetchLimit,
   BROKERAGE,
 } = require('./searchEngine');
-const { MLS_GRID_BASE_URL } = require('../config');
+const { MLS_GRID_BASE_URL, NODE_ENV } = require('../config');
+const isDev = NODE_ENV === 'development';
 
 /**
  * Get properties with full search pipeline.
@@ -232,14 +233,22 @@ async function getPropertyById(listingId) {
 /**
  * Get a single property by ListingId with ALL media (0 = unlimited).
  * Used for property detail pages where full gallery is needed.
+ * This is called by getListingById in the controller.
  */
 async function getPropertyByIdWithAllMedia(listingId) {
   if (!listingId) return null;
+  // Use getPropertyByKey for reliable entity-key access with full Media
+  try {
+    const keyResult = await getPropertyByKey(listingId);
+    if (keyResult?.data) return keyResult.data;
+  } catch {
+    // fall through to getProperties
+  }
+  // Fallback to search-based lookup
   const result = await getProperties({
     listingId,
     top: 1,
     applyBrokerageScope: false,
-    // maxMedia=0 means unlimited media — handled by the default in normalizeProperty
   });
   return result.data[0] || null;
 }
@@ -522,14 +531,40 @@ async function getPropertiesByCity(cityName, params = {}) {
   const url = `${MLS_GRID_BASE_URL}/Property?${queryString}`;
   const data = await fetchWithRetry(url);
 
+  // ─── CONCORD DEBUG: Log raw MLS response count ───
+  const mlsReturnedCount = data['@odata.count'] || data.value?.length || 0;
+  const rawCities = new Set((data.value || []).map(p => String(p.City || '').trim()).filter(Boolean));
+  const rawOsn = new Set((data.value || []).map(p => String(p.OriginatingSystemName || '').trim()).filter(Boolean));
+
   // Normalize with limited media for list views
   let properties = (data.value || []).map(p => normalizeProperty(p, { maxMedia: 3 }));
+  const normalizedCount = properties.length;
 
   // Apply local city filter (case-insensitive, exact match)
   const cityLower = cityName.toLowerCase().trim();
   properties = properties.filter(p =>
     String(p.City || '').toLowerCase().trim() === cityLower
   );
+  const afterCityFilter = properties.length;
+
+  // ─── CONCORD DEBUG: Log filtering counts ───
+  if (isDev || cityLower === 'concord') {
+    const afterPriceFilter = afterCityFilter;
+    const osnList = Array.from(rawOsn).join(', ');
+    const cityList = Array.from(rawCities).slice(0, 20).join(', ');
+    console.log(
+      '\x1b[36m━━━ [CitySearch] ' + cityName + ' ━━━\x1b[0m\n' +
+      `  MLS returned     : ${mlsReturnedCount} total (fetched ${normalizedCount})\n` +
+      `  Cities in response: ${cityList || '(none)'}\n` +
+      `  OriginatingSystems: ${osnList || '(none)'}\n` +
+      `  Normalized        : ${normalizedCount}\n` +
+      `  After city filter : ${afterCityFilter}\n` +
+      `  Price/beds filter : ${afterPriceFilter}\n` +
+      `  Returned (page)   : ${Math.min(top, Math.max(0, afterPriceFilter - skip))}\n` +
+      `  Has more          : ${(skip + top) < afterPriceFilter}\n` +
+      '\x1b[36m━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━\x1b[0m'
+    );
+  }
 
   // Apply additional local filters (normalize param names)
   const pMin = params.priceMin || params.minPrice;
@@ -623,9 +658,140 @@ async function verifyConnection() {
   }
 }
 
+/**
+ * Get Open Houses for a specific property by ListingKey.
+ * Queries MLS OpenHouse resource filtered by the property's ListingKey.
+ * Returns hasOpenHouse, upcoming dates, times, and status.
+ */
+async function getOpenHousesByProperty(listingKey) {
+  if (!listingKey) {
+    return { success: false, hasOpenHouse: false, openHouses: [], error: 'ListingKey required' };
+  }
+  try {
+    // ListingKey is NOT filterable on OpenHouse in MLS Grid (throws 400).
+    // Instead, fetch a set of recent open houses and filter locally.
+    // Avoid $orderby on OpenHouse — it may also be rejected.
+    const url = `${MLS_GRID_BASE_URL}/OpenHouse?$filter=OriginatingSystemName eq 'carolina'&$top=50`;
+    const data = await fetchWithRetry(url);
+    const allOpenHouses = (data.value || []);
+
+    // Filter locally by ListingKey (case-sensitive comparison)
+    const openHouses = allOpenHouses
+      .filter(oh => oh.ListingKey === listingKey)
+      .map(oh => ({
+        listingKey: oh.ListingKey,
+        date: oh.OpenHouseDate || oh.Date || null,
+        startTime: oh.OpenHouseStartTime || oh.StartTime || null,
+        endTime: oh.OpenHouseEndTime || oh.EndTime || null,
+        type: oh.OpenHouseType || oh.Type || 'Public',
+        remarks: oh.OpenHouseRemarks || oh.Remarks || '',
+      }));
+
+    const now = new Date();
+    const today = new Date(now.getFullYear(), now.getMonth(), now.getDate());
+    const upcoming = openHouses.filter(oh => {
+      if (!oh.date) return false;
+      const ohDate = new Date(oh.date);
+      return ohDate >= today;
+    });
+
+    return {
+      success: true,
+      hasOpenHouse: upcoming.length > 0,
+      openHouses: upcoming.map(oh => ({
+        ...oh,
+        date: oh.date ? new Date(oh.date).toISOString().split('T')[0] : null,
+      })),
+      totalCount: openHouses.length,
+    };
+  } catch (err) {
+    console.warn(`[getOpenHousesByProperty] Error for ${listingKey}: ${err.message}`);
+    return { success: false, hasOpenHouse: false, openHouses: [], error: err.message };
+  }
+}
+
+/**
+ * Get comparable properties for a listing.
+ * Fetches real MLS properties in the same ZIP/city with similar characteristics.
+ */
+async function getComparableProperties(listingKey) {
+  if (!listingKey) {
+    return { success: false, data: [], error: 'ListingKey required' };
+  }
+  try {
+    // First get the source property to know its details
+    const propUrl = `${MLS_GRID_BASE_URL}/Property('${encodeURIComponent(listingKey)}')`;
+    const sourceData = await fetchWithRetry(propUrl);
+    const source = sourceData || {};
+
+    const city = source.City || '';
+    const zip = source.PostalCode || '';
+    const price = source.ListPrice || 0;
+    const type = source.PropertyType || '';
+    const beds = source.BedroomsTotal || 0;
+    const baths = source.BathroomsFull || 0;
+
+    // Fetch properties in same city for comparables
+    const filterParts = [`OriginatingSystemName eq 'carolina'`, `MlgCanView eq true`];
+    if (type) filterParts.push(`PropertyType eq '${type.replace(/'/g, "''")}'`);
+    // Status: Closed (sold comps) or Active (current comps)
+    filterParts.push(`(StandardStatus eq 'Active' or StandardStatus eq 'Closed')`);
+
+    const odataQuery = `$filter=${encodeURIComponent(filterParts.join(' and '))}&$top=50&$orderby=ModificationTimestamp desc&$count=true&$expand=Media`;
+    const url = `${MLS_GRID_BASE_URL}/Property?${odataQuery}`;
+    const data = await fetchWithRetry(url);
+
+    const properties = (data.value || [])
+      .filter(p => p.ListingKey !== listingKey)
+      .map(p => normalizeProperty(p, { maxMedia: 1 }))
+      .filter(Boolean);
+
+    // Score and sort by similarity
+    const scored = properties.map(p => {
+      let score = 0;
+      const sameZip = p.PostalCode && zip && String(p.PostalCode).substring(0, 5) === String(zip).substring(0, 5);
+      const sameCity = p.City && city && String(p.City).toLowerCase() === String(city).toLowerCase();
+      const priceDiff = price > 0 ? Math.abs(Number(p.ListPrice || 0) - price) / price : 1;
+      const bedsDiff = Math.abs(Number(p.BedroomsTotal || 0) - beds);
+      const bathsDiff = Math.abs(Number(p.BathroomsFull || 0) - baths);
+
+      if (sameZip) score += 30;
+      if (sameCity) score += 20;
+      if (type && p.PropertyType === type) score += 15;
+      if (priceDiff < 0.1) score += 15;
+      else if (priceDiff < 0.25) score += 10;
+      else if (priceDiff < 0.5) score += 5;
+      if (bedsDiff === 0) score += 10;
+      else if (bedsDiff <= 1) score += 5;
+      if (bathsDiff === 0) score += 10;
+      else if (bathsDiff <= 1) score += 5;
+
+      // Same status
+      if (p.StandardStatus === source.StandardStatus) score += 5;
+
+      return { ...p, similarityScore: score };
+    });
+
+    const sorted = scored.sort((a, b) => b.similarityScore - a.similarityScore).slice(0, 6);
+
+    return {
+      success: true,
+      data: sorted,
+      totalCount: properties.length,
+      source: {
+        city, zip, price, propertyType: type, bedrooms: beds, bathrooms: baths,
+      },
+    };
+  } catch (err) {
+    console.warn(`[getComparableProperties] Error for ${listingKey}: ${err.message}`);
+    return { success: false, data: [], error: err.message };
+  }
+}
+
 module.exports = {
   getProperties,
   getPropertyById,
+  getPropertyByIdWithAllMedia,
   getPropertyByKey,
   getPropertiesByOffice,
   getPropertiesByAgent,
@@ -639,6 +805,8 @@ module.exports = {
   getOffices,
   getOpenHouses,
   getOpenHouseProperties,
+  getOpenHousesByProperty,
+  getComparableProperties,
   getLookupData,
   getMedia,
   getActiveListings,

@@ -1,6 +1,18 @@
 function errorHandler(err, req, res, _next) {
   const statusCode = err.statusCode || 500;
 
+  // CRITICAL: Override Cache-Control on error responses.
+  // The /api Cache-Control middleware runs BEFORE route handlers,
+  // so it sets caching headers on ALL responses — including errors.
+  // Without this override, browsers cache 500 error responses for 5
+  // minutes, making the site appear broken long after the issue resolves.
+  // Using 'no-store' ensures the browser NEVER caches an error response.
+  try {
+    res.set('Cache-Control', 'no-cache, no-store, must-revalidate');
+    res.removeHeader('Last-Modified');
+    res.removeHeader('ETag');
+  } catch (_) {}
+
   const response = {
     success: false,
     error: err.message || 'Internal Server Error',
