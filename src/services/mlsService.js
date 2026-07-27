@@ -19,7 +19,7 @@ const { MLS_GRID_BASE_URL, MLS_GRID_ACCESS_TOKEN, MLS_GRID_TIMEOUT, MLS_GRID_MAX
 // MEDIA URL STORE
 // Maps a stable MediaKey to the current signed MediaURL from MLS Grid.
 // ============================================================
-/** @type {Map<string, { signedUrl: string, expiresAt: number }>} */
+/** @type {Map<string, { signedUrl: string, listingKey: string, expiresAt: number }>} */
 const mediaUrlStore = new Map();
 const MEDIA_URL_STORE_TTL = 14_400_000; // 4 hours
 
@@ -156,17 +156,66 @@ async function fetchWithRetry(url, options, retries = parseInt(MLS_GRID_MAX_RETR
 
 /**
  * REFRESH SIGNED URL from MLS Grid.
+ * Uses three strategies:
+ * 1. Direct Map.get() lookup (O(1)) followed by entity key access: Property('ListingKey')?$expand=Media
+ * 2. Fallback to $filter with Media/any() lambda
+ * 3. Search 25 recent properties with $expand=Media for cold-start MediaKey discovery
  */
 async function refreshSignedUrl(mediaKey) {
+  // Strategy 1: Use the mediaUrlStore to find a cached ListingKey mapping
+  // We maintain a reverse mapping from MediaKey -> ListingKey
+  // Direct O(1) lookup using Map.get(), which is the primary purpose of Map
+  const storeEntry = mediaUrlStore.get(mediaKey);
+  if (storeEntry && storeEntry.listingKey) {
+    const listingKey = storeEntry.listingKey;
+    try {
+      const url = `${MLS_GRID_BASE_URL}/Property('${encodeURIComponent(listingKey)}')?$expand=Media`;
+      const data = await fetchWithRetry(url);
+      if (data && data.Media) {
+        const mediaItem = (data.Media || []).find(m => m.MediaKey === mediaKey);
+        if (mediaItem && (mediaItem.MediaURL || mediaItem.MediaUrl)) {
+          const signedUrl = mediaItem.MediaURL || mediaItem.MediaUrl;
+          mediaUrlStore.set(mediaKey, { signedUrl, listingKey, expiresAt: Date.now() + MEDIA_URL_STORE_TTL });
+          return signedUrl;
+        }
+      }
+    } catch (err) {
+      // Fall through to strategy 2
+    }
+  }
+
+  // Strategy 2: Try Media/any() lambda filter
   try {
     const url = `${MLS_GRID_BASE_URL}/Property?$expand=Media&$filter=Media/any(m: m/MediaKey%20eq%20'${encodeURIComponent(mediaKey)}')&$top=1`;
     const data = await fetchWithRetry(url);
     if (data.value && data.value.length > 0) {
+      const listingKey = data.value[0].ListingKey;
       const media = (data.value[0].Media || []).find(m => m.MediaKey === mediaKey);
       if (media && (media.MediaURL || media.MediaUrl)) {
         const signedUrl = media.MediaURL || media.MediaUrl;
-        mediaUrlStore.set(mediaKey, { signedUrl, expiresAt: Date.now() + MEDIA_URL_STORE_TTL });
+        mediaUrlStore.set(mediaKey, { signedUrl, listingKey, expiresAt: Date.now() + MEDIA_URL_STORE_TTL });
         return signedUrl;
+      }
+    }
+  } catch (err) {
+    // Fall through to strategy 3
+  }
+
+  // Strategy 3: Search recent properties for cold-start reliability
+  // When mediaUrlStore is empty (after cold restart), search recently modified
+  // properties with $expand=Media to find the matching MediaKey
+  try {
+    const url = `${MLS_GRID_BASE_URL}/Property?$expand=Media&$orderby=ModificationTimestamp%20desc&$top=25`;
+    const data = await fetchWithRetry(url);
+    if (data.value && data.value.length > 0) {
+      for (const prop of data.value) {
+        const listingKey = prop.ListingKey;
+        const media = (prop.Media || []).find(m => m.MediaKey === mediaKey);
+        if (media && (media.MediaURL || media.MediaUrl)) {
+          const signedUrl = media.MediaURL || media.MediaUrl;
+          mediaUrlStore.set(mediaKey, { signedUrl, listingKey, expiresAt: Date.now() + MEDIA_URL_STORE_TTL });
+          return signedUrl;
+        }
       }
     }
   } catch (err) {
@@ -228,10 +277,11 @@ async function streamMediaImage(mediaKey, req, res) {
   }
 
   if (!signedUrl) {
+    // Diagnostics: log why refresh failed
+    const hadEntry = !!entry;
+    console.warn('[ImageProxy] 204 for', mediaKey, '| store had entry:', hadEntry);
     if (!res.headersSent) {
-      res.setHeader('Content-Type', 'image/svg+xml');
-      res.setHeader('Cache-Control', 'no-cache');
-      res.end('<svg xmlns="http://www.w3.org/2000/svg" width="1" height="1"/>');
+      res.status(204).end();
     }
     return;
   }
@@ -246,6 +296,7 @@ async function streamMediaImage(mediaKey, req, res) {
     res.setHeader('Last-Modified', lastModified);
     if (etag) res.setHeader('ETag', etag);
     res.setHeader('Access-Control-Allow-Origin', '*');
+    res.setHeader('Cross-Origin-Resource-Policy', 'cross-origin');
     res.setHeader('X-Cache', 'HIT');
     res.end(buffer);
     return;
@@ -280,14 +331,13 @@ async function streamMediaImage(mediaKey, req, res) {
     res.setHeader('Last-Modified', lastModified);
     if (etag) res.setHeader('ETag', etag);
     res.setHeader('Access-Control-Allow-Origin', '*');
+    res.setHeader('Cross-Origin-Resource-Policy', 'cross-origin');
     res.setHeader('X-Cache', 'MISS');
     res.end(buffer);
   } catch (err) {
     if (err.message && (err.message.includes('429') || err.message.includes('503'))) {
       if (!res.headersSent) {
-        res.setHeader('Content-Type', 'image/svg+xml');
-        res.setHeader('Cache-Control', 'no-cache');
-        res.end('<svg xmlns="http://www.w3.org/2000/svg" width="1" height="1"/>');
+        res.status(204).end();
       }
       return;
     }
@@ -378,8 +428,10 @@ function getSignedMediaUrl(mediaKey) {
 
 /**
  * Normalize a single MLS Grid property object.
- * Converts direct CDN URLs to proxy paths (/api/image/:mediaKey).
- * Limits media to reduce signed URL generation on list views.
+ * Preserves CDN URLs as-is for reliable image loading.
+ * Also provides proxy paths (/api/image/:mediaKey) as MediaProxyURL
+ * for optional backend proxy usage (e.g., gallery batch loading).
+ * Limits media to reduce CDN requests on list views.
  */
 function normalizeProperty(item, options = {}) {
   if (!item) return null;
@@ -393,32 +445,30 @@ function normalizeProperty(item, options = {}) {
     .map(m => {
       const mediaKey = m.MediaKey;
       const signedUrl = m.MediaURL || m.MediaUrl || '';
+      // Store the ListingKey alongside the signed URL for reliable refresh
+      const listingKey = item.ListingKey || '';
       if (mediaKey && signedUrl) {
         mediaUrlStore.set(mediaKey, {
           signedUrl,
+          listingKey,
           expiresAt: Date.now() + MEDIA_URL_STORE_TTL,
         });
       }
-      const transformedUrl = (mediaKey && signedUrl) ? `/api/image/${mediaKey}` : null;
+
+      // MediaURL = CDN URL (direct from MLS, always works)
+      // MediaProxyURL = backend proxy path (optional, for gallery batch loading)
+      const proxyUrl = (mediaKey && signedUrl) ? `/api/image/${mediaKey}` : null;
 
       return {
         MediaKey: m.MediaKey,
-        MediaURL: transformedUrl,
+        MediaURL: signedUrl,            // CDN URL - always works, no proxy dependency
+        MediaProxyURL: proxyUrl,         // Proxy URL - optional, for batch loading
         MediaCategory: m.MediaCategory || '',
         Order: m.Order || m.Ordering || 0,
         PreferredPhotoYN: m.PreferredPhotoYN,
       };
     })
-    .filter(m => {
-      if (!m.MediaURL) return false;
-      if (m.MediaURL.startsWith('/api/image/')) return true;
-      try {
-        const parsed = new URL(m.MediaURL);
-        return parsed.protocol === 'http:' || parsed.protocol === 'https:';
-      } catch {
-        return false;
-      }
-    });
+    .filter(m => m.MediaURL);
 
   media.sort((a, b) => {
     if (a.PreferredPhotoYN && !b.PreferredPhotoYN) return -1;

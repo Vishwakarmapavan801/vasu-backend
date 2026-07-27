@@ -71,8 +71,8 @@ function validateEmail(val) {
 /**
  * Validate phone field (optional but must match pattern if provided).
  */
-function validatePhone(val) {
-  if (!val || !val.trim()) return null; // optional unless specified
+function validatePhone(val, isRequired) {
+  if (!val || !val.trim()) return isRequired ? 'Phone is required' : null;
   if (!PHONE_RE.test(val.trim())) return 'Invalid phone number';
   return null;
 }
@@ -105,15 +105,13 @@ function createdResponse(res, record, message) {
 async function handleInsert(req, res, next, serviceFn, extractData, successMsg, afterInsert) {
   try {
     const data = extractData(req.body);
-    const record = await serviceFn(data);
-    // Fire-and-forget: execute post-insert callback (e.g., email notification)
-    // without blocking the response. Failures are logged by the callback.
+    const meta = { clientIp: getClientIp(req), userAgent: (req.headers['user-agent'] || '').slice(0, 500) };
+    const record = await serviceFn(data, meta);
     if (typeof afterInsert === 'function') {
       afterInsert(record, data).catch(() => {});
     }
     return createdResponse(res, record, successMsg);
   } catch (err) {
-    // Handle unique constraint violations (e.g., duplicate email)
     if (err.code === '23505') {
       return res.status(409).json({
         success: false,

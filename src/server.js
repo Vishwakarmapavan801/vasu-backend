@@ -18,6 +18,11 @@ const { PORT, CLIENT_URL, NODE_ENV } = require('./config');
 const { errorHandler, notFoundHandler } = require('./middleware/errorHandler');
 const compression = require('./middleware/compression');
 
+// ============================================================
+// JotForm Integration – start after DB is ready
+// ============================================================
+const jotformService = require('./services/jotformService');
+
 const mlsRoutes = require('./routes/mls');
 const preApprovalRoutes = require('./routes/preApproval');
 const formRoutes = require('./routes/formRoutes');
@@ -63,6 +68,10 @@ const corsOptions = {
 app.use(compression);
 app.use(helmet());
 app.use(cors(corsOptions));
+app.use((_req, res, next) => {
+  res.setHeader('Cross-Origin-Resource-Policy', 'cross-origin');
+  next();
+});
 app.use(express.json({ limit: '10mb' }));
 app.use(express.urlencoded({ extended: true }));
 
@@ -87,6 +96,22 @@ app.use('/api/', (req, res, next) => {
   }
   return apiLimiter(req, res, next);
 });
+
+// ============================================================
+// JotForm environment validation at startup
+// ============================================================
+const JOTFORM_REQUIRED_VARS = [
+  'JOTFORM_API_KEY',
+  'JOTFORM_FORM_ID_CONTACT', 'JOTFORM_FORM_ID_TOUR', 'JOTFORM_FORM_ID_VALUATION',
+  'JOTFORM_FORM_ID_NEWSLETTER', 'JOTFORM_FORM_ID_PREAPPROVAL', 'JOTFORM_FORM_ID_BUYER_AGENT',
+  'JOTFORM_FORM_ID_AGENT_INQUIRY', 'JOTFORM_FORM_ID_CALLBACK', 'JOTFORM_FORM_ID_QUICK_QUESTION',
+  'JOTFORM_FORM_ID_CAREER', 'JOTFORM_FORM_ID_ONBOARDING', 'JOTFORM_FORM_ID_SELLER_REQUEST',
+  'JOTFORM_FORM_ID_AI_DEMO', 'JOTFORM_FORM_ID_AI_CONTACT', 'JOTFORM_FORM_ID_COOKIE_CONSENT',
+];
+const missingVars = JOTFORM_REQUIRED_VARS.filter((v) => !process.env[v]);
+if (missingVars.length > 0) {
+  console.warn(`\n  ⚠ JotForm environment variables not set:\n    - ${missingVars.join('\n    - ')}\n  JotForm submissions will be skipped until these are configured.\n`);
+}
 
 // ============================================================
 // Cache-Control Headers for MLS Grid API Responses
@@ -115,6 +140,15 @@ app.get('/db-check', async (req, res, next) => {
   try {
     const result = await pool.query('SELECT NOW()');
     res.json({ success: true, timestamp: result.rows[0].now });
+  } catch (error) {
+    next(error);
+  }
+});
+
+app.get('/api/health/jotform', async (_req, res, next) => {
+  try {
+    const health = await jotformService.getHealth();
+    res.json({ success: true, ...health });
   } catch (error) {
     next(error);
   }
@@ -172,4 +206,8 @@ app.listen(serverPort, () => {
   console.log(`  CORS Origin : ${CLIENT_URL}`);
   console.log(`  ─────────────────────────`);
   console.log(`  Server running at http://localhost:${serverPort}\n`);
+
+  // Start JotForm background processor after DB is confirmed ready
+  console.log('  Starting JotForm sync queue processor...');
+  jotformService.startBackgroundProcessor();
 });
