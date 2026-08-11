@@ -1,13 +1,17 @@
 const propertyService = require('../services/propertyService');
 const mlsService = require('../services/mlsService');
+const imageProcessor = require('../services/imageProcessor');
+const complianceService = require('../services/compliance/complianceService');
 const { parseQueryParams } = require('../utils/parseQueryParams');
 
 async function getListings(req, res, next) {
   try {
     const params = parseQueryParams(req);
     const result = await propertyService.getProperties(params);
-    // Service already returns correct hasMore for local-filtered responses.
-    // Do NOT overwrite with MLS nextLink - it's invalid after local filtering.
+    if (result.data) {
+      result.data = complianceService.buildCompliantResponse(result.data, req.user?.id);
+    }
+    result._disclaimer = complianceService.getDisclaimer();
     return res.json(result);
   } catch (err) {
     next(err);
@@ -18,6 +22,10 @@ async function getFeaturedListings(req, res, next) {
   try {
     const params = parseQueryParams(req);
     const result = await propertyService.getFeaturedProperties(params);
+    if (result.data) {
+      result.data = complianceService.buildCompliantResponse(result.data, req.user?.id);
+    }
+    result._disclaimer = complianceService.getDisclaimer();
     return res.json(result);
   } catch (err) {
     next(err);
@@ -38,7 +46,8 @@ async function getListingById(req, res, next) {
       });
     }
 
-    return res.json({ success: true, data: result });
+    const compliant = complianceService.buildCompliantResponse([result], req.user?.id);
+    return res.json({ success: true, data: compliant[0], _disclaimer: complianceService.getDisclaimer() });
   } catch (err) {
     next(err);
   }
@@ -121,6 +130,10 @@ async function getSoldListings(req, res, next) {
   try {
     const params = parseQueryParams(req);
     const result = await propertyService.getSoldProperties(params);
+    if (result.data) {
+      result.data = complianceService.buildCompliantResponse(result.data, req.user?.id);
+    }
+    result._disclaimer = complianceService.getDisclaimer();
     return res.json(result);
   } catch (err) {
     next(err);
@@ -131,6 +144,10 @@ async function getActiveListings(req, res, next) {
   try {
     const params = parseQueryParams(req);
     const result = await propertyService.getActiveListings(params);
+    if (result.data) {
+      result.data = complianceService.buildCompliantResponse(result.data, req.user?.id);
+    }
+    result._disclaimer = complianceService.getDisclaimer();
     return res.json(result);
   } catch (err) {
     next(err);
@@ -141,6 +158,15 @@ async function getMembers(req, res, next) {
   try {
     const params = parseQueryParams(req);
     const result = await propertyService.getMembers(params);
+    return res.json(result);
+  } catch (err) {
+    next(err);
+  }
+}
+
+async function getMemberByMlsId(req, res, next) {
+  try {
+    const result = await propertyService.getMemberByMlsId(req.params.memberMlsId);
     return res.json(result);
   } catch (err) {
     next(err);
@@ -259,10 +285,24 @@ async function serveMediaImage(req, res, next) {
       return res.status(400).json({ success: false, error: 'Media key required' });
     }
 
-    await mlsService.streamMediaImage(mediaKey, req, res);
+    const opts = imageProcessor.parseVariant(req.query, req);
+    if (opts.isVariant) {
+      // Responsive variant (srcset sizes, thumbnails, LQIP). Ignore the
+      // browser's conditional headers when producing the source bytes — the
+      // variant itself is disk-cached with its own immutable ETag.
+      await imageProcessor.serveVariant(mediaKey, opts, req, res, {
+        fetchOriginal: () => mlsService.fetchMediaBuffer(mediaKey, null),
+      });
+    } else {
+      // Full-resolution original — streamed from the persistent store with
+      // Range (206) + conditional (304) support.
+      await imageProcessor.serveOriginal(mediaKey, req, res, {
+        fetchOriginal: () => mlsService.fetchMediaBuffer(mediaKey, null),
+      });
+    }
 
     const elapsed = Date.now() - startTime;
-    console.log(`[ImageProxy] Served ${mediaKey} in ${elapsed}ms`);
+    console.log(`[ImageProxy] Served ${mediaKey} in ${elapsed}ms (cache=${res.getHeader('X-Cache') || '-'})`);
   } catch (err) {
     const elapsed = Date.now() - startTime;
     const msg = err.message || '';
@@ -295,6 +335,16 @@ async function serveMediaImage(req, res, next) {
   }
 }
 
+async function getImageMetrics(req, res) {
+  const metrics = require('../utils/imageMetrics');
+  const warm = imageProcessor.warmStats();
+  return res.json({
+    success: true,
+    warm,
+    ...metrics.snapshot(),
+  });
+}
+
 const SUPPORTED_CITIES_MAP = {
   charlotte: { name: 'Charlotte', state: 'NC', path: '/nc/charlotte' },
   waxhaw: { name: 'Waxhaw', state: 'NC', path: '/nc/waxhaw' },
@@ -311,13 +361,18 @@ async function getCities(req, res, next) {
       Object.entries(SUPPORTED_CITIES_MAP).map(async ([slug, info]) => {
         const cityName = slug.split('-').map(w => w.charAt(0).toUpperCase() + w.slice(1)).join(' ');
         const data = await propertyService.getPropertiesByCity(cityName, { top: 1 });
-        return { ...info, count: data.totalCount || 0 };
+        const first = data.data && data.data[0];
+        return {
+          ...info,
+          count: data.totalCount || 0,
+          image: first?.Media?.[0]?.MediaProxyURL || first?.Media?.[0]?.MediaURL || first?.image || '',
+        };
       })
     );
     const cities = results.map((r, i) => {
       const slug = Object.keys(SUPPORTED_CITIES_MAP)[i];
       const info = SUPPORTED_CITIES_MAP[slug];
-      return r.status === 'fulfilled' ? r.value : { ...info, count: 0 };
+      return r.status === 'fulfilled' ? r.value : { ...info, count: 0, image: '' };
     });
     return res.json({ success: true, data: cities });
   } catch (err) {
@@ -375,6 +430,7 @@ module.exports = {
   getSoldListings,
   getActiveListings,
   getMembers,
+  getMemberByMlsId,
   getOffices,
   getOpenHouses,
   getOpenHouseListings,
@@ -384,4 +440,5 @@ module.exports = {
   getMedia,
   verifyConnection,
   serveMediaImage,
+  getImageMetrics,
 };

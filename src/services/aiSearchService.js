@@ -223,7 +223,7 @@ function formatPropertyForAI(property) {
     lotSize: property.LotSizeAcres || 0,
     listingKey: property.ListingKey || '',
     listingId: property.ListingId || '',
-    image: property.Media?.[0]?.MediaURL || '',
+    image: property.Media?.[0]?.MediaProxyURL || property.Media?.[0]?.MediaURL || '',
     description: property.PublicRemarks || '',
     features: [
       property.PoolYN ? 'Pool' : null,

@@ -32,11 +32,6 @@ async function getCompanyStats() {
         suffix: '+',
         label: 'Expert Agents',
       },
-      clientSatisfaction: {
-        value: null,
-        suffix: '%',
-        label: 'Client Satisfaction',
-      },
       yearsExperience: {
         value: yearsExp,
         suffix: '+',

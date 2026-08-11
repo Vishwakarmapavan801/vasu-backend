@@ -3,4 +3,6 @@ node_modules/
 nul
 *.log
 .image-cache/
+.cache/
+uploads/
 

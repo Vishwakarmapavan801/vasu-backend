@@ -1,1 +1,878 @@
-Access is denied.
+◇ injected env (32) from .env // tip: ◈ encrypted .env [www.dotenvx.com]
+◇ injected env (0) from .env // tip: ⌘ suppress logs { quiet: true }
+
+  Database Configuration
+  ─────────────────────
+  ✓ Environment : Local (development)
+  ✓ Connection  : Local PostgreSQL
+  ✓ DB_HOST      = localhost
+  ✓ DB_PORT      = 5432
+  ✓ DB_NAME      = vasu
+  ✓ DB_USER      = postgres
+  ✓ DB_PASSWORD  = ****
+  ✓ Database configuration resolved
+
+  Vasu Realty MLS API Server
+  ─────────────────────────
+  Environment : development
+  Port        : 5000
+  MLS Grid    : https://api-demo.mlsgrid.com/v2
+  Database    : vasu
+  Host        : localhost
+  Connection  : Local PostgreSQL
+  CORS Origin : http://localhost:5173
+  ─────────────────────────
+  Server running at http://localhost:5000
+
+  Starting JotForm sync queue processor...
+{"timestamp":"2026-07-29T09:10:59.000Z","level":"info","message":"Starting JotForm sync queue background processor"}
+  ✓ PostgreSQL Connected Successfully
+    Server time: Wed Jul 29 2026 14:40:59 GMT+0530 (India Standard Time)
+    Database    : vasu
+    Host        : localhost
+
+[0mPOST /api/auth/login [33m401[0m 362.805 ms - 54[0m
+[0mGET /api/properties?top=1 [32m200[0m 3462.550 ms - -[0m
+[0mGET /api/properties/featured?limit=1 [32m200[0m 4292.226 ms - -[0m
+[0mGET /api/properties/featured?limit=12 [32m200[0m 1063.214 ms - -[0m
+[0mGET /api/mls/open-houses/listings?limit=12 [32m200[0m 1058.919 ms - -[0m
+[36m━━━ [CitySearch] Charlotte ━━━[0m
+  MLS returned     : 3389 total (fetched 500)
+  Cities in response: Fletcher, Maggie Valley, Cornelius, Fort Mill, Mount Pleasant, Waxhaw, Gastonia, China Grove, Taylorsville, Charlotte, Mooresville, Asheville, Kannapolis, Biltmore Lake, Weaverville, Rutherfordton, Arden, Terrell, Smyrna, Waynesville
+  OriginatingSystems: carolina
+  Normalized        : 500
+  After city filter : 101
+  Price/beds filter : 101
+  Returned (page)   : 1
+  Has more          : true
+[36m━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━[0m
+[36m━━━ [CitySearch] Waxhaw ━━━[0m
+  MLS returned     : 3389 total (fetched 500)
+  Cities in response: Fletcher, Maggie Valley, Cornelius, Fort Mill, Mount Pleasant, Waxhaw, Gastonia, China Grove, Taylorsville, Charlotte, Mooresville, Asheville, Kannapolis, Biltmore Lake, Weaverville, Rutherfordton, Arden, Terrell, Smyrna, Waynesville
+  OriginatingSystems: carolina
+  Normalized        : 500
+  After city filter : 11
+  Price/beds filter : 11
+  Returned (page)   : 1
+  Has more          : true
+[36m━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━[0m
+[36m━━━ [CitySearch] Concord ━━━[0m
+  MLS returned     : 3389 total (fetched 500)
+  Cities in response: Fletcher, Maggie Valley, Cornelius, Fort Mill, Mount Pleasant, Waxhaw, Gastonia, China Grove, Taylorsville, Charlotte, Mooresville, Asheville, Kannapolis, Biltmore Lake, Weaverville, Rutherfordton, Arden, Terrell, Smyrna, Waynesville
+  OriginatingSystems: carolina
+  Normalized        : 500
+  After city filter : 13
+  Price/beds filter : 13
+  Returned (page)   : 1
+  Has more          : true
+[36m━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━[0m
+[36m━━━ [CitySearch] Gastonia ━━━[0m
+  MLS returned     : 3389 total (fetched 500)
+  Cities in response: Fletcher, Maggie Valley, Cornelius, Fort Mill, Mount Pleasant, Waxhaw, Gastonia, China Grove, Taylorsville, Charlotte, Mooresville, Asheville, Kannapolis, Biltmore Lake, Weaverville, Rutherfordton, Arden, Terrell, Smyrna, Waynesville
+  OriginatingSystems: carolina
+  Normalized        : 500
+  After city filter : 9
+  Price/beds filter : 9
+  Returned (page)   : 1
+  Has more          : true
+[36m━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━[0m
+[36m━━━ [CitySearch] Rock hill ━━━[0m
+  MLS returned     : 3389 total (fetched 500)
+  Cities in response: Fletcher, Maggie Valley, Cornelius, Fort Mill, Mount Pleasant, Waxhaw, Gastonia, China Grove, Taylorsville, Charlotte, Mooresville, Asheville, Kannapolis, Biltmore Lake, Weaverville, Rutherfordton, Arden, Terrell, Smyrna, Waynesville
+  OriginatingSystems: carolina
+  Normalized        : 500
+  After city filter : 14
+  Price/beds filter : 14
+  Returned (page)   : 1
+  Has more          : true
+[36m━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━[0m
+[36m━━━ [CitySearch] Fort mill ━━━[0m
+  MLS returned     : 3389 total (fetched 500)
+  Cities in response: Fletcher, Maggie Valley, Cornelius, Fort Mill, Mount Pleasant, Waxhaw, Gastonia, China Grove, Taylorsville, Charlotte, Mooresville, Asheville, Kannapolis, Biltmore Lake, Weaverville, Rutherfordton, Arden, Terrell, Smyrna, Waynesville
+  OriginatingSystems: carolina
+  Normalized        : 500
+  After city filter : 9
+  Price/beds filter : 9
+  Returned (page)   : 1
+  Has more          : true
+[36m━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━[0m
+[36m━━━ [CitySearch] Tega cay ━━━[0m
+  MLS returned     : 3389 total (fetched 500)
+  Cities in response: Fletcher, Maggie Valley, Cornelius, Fort Mill, Mount Pleasant, Waxhaw, Gastonia, China Grove, Taylorsville, Charlotte, Mooresville, Asheville, Kannapolis, Biltmore Lake, Weaverville, Rutherfordton, Arden, Terrell, Smyrna, Waynesville
+  OriginatingSystems: carolina
+  Normalized        : 500
+  After city filter : 1
+  Price/beds filter : 1
+  Returned (page)   : 1
+  Has more          : false
+[36m━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━[0m
+[0mGET /api/cities [32m200[0m 4294.585 ms - 485[0m
+[0mGET /api/properties/search?q=Concord,+NC&limit=6 [32m200[0m 3414.570 ms - -[0m
+[0mGET /api/properties/CAR290046728 [32m200[0m 1373.887 ms - -[0m
+[0mGET /api/mls/open-houses/property/CAR290046728 [32m200[0m 1811.719 ms - 68[0m
+[0mGET /api/comparisons [33m401[0m 3.879 ms - 68[0m
+[0mGET /api/recently-viewed?limit=6 [33m401[0m 3.161 ms - 68[0m
+[0mGET /api/property-history/CAR290046728 [31m500[0m 19.472 ms - 72[0m
+[0mGET /api/mls/members?limit=100 [32m200[0m 644.373 ms - -[0m
+[0mGET /api/comparisons [33m401[0m 0.881 ms - 68[0m
+[0mGET /api/recently-viewed?limit=6 [33m401[0m 1.403 ms - 68[0m
+[0mGET /api/property-history/CAR290046728 [31m500[0m 131.345 ms - 72[0m
+[0mGET /api/recently-viewed?limit=6 [33m401[0m 1.419 ms - 68[0m
+[0mGET /api/comparisons [33m401[0m 0.942 ms - 68[0m
+[0mGET /api/property-history/CAR290046728 [31m500[0m 71.530 ms - 72[0m
+[0mPOST /api/auth/register [33m409[0m 15.886 ms - 70[0m
+[0mPOST /api/auth/register [32m201[0m 453.000 ms - 431[0m
+[0mGET /api/favorites/check/CAR299951865 [32m200[0m 54.303 ms - 47[0m
+[0mGET /api/favorites/check/CAR291655837 [32m200[0m 339.282 ms - 47[0m
+[0mGET /api/favorites/check/CAR303230628 [32m200[0m 374.015 ms - 47[0m
+[0mGET /api/favorites/check/CAR302863921 [32m200[0m 408.002 ms - 47[0m
+[0mGET /api/favorites/check/CAR297801547 [32m200[0m 457.332 ms - 47[0m
+[0mGET /api/favorites/check/CAR303530978 [32m200[0m 468.252 ms - 47[0m
+[36m━━━ [CitySearch] Charlotte ━━━[0m
+  MLS returned     : 3389 total (fetched 500)
+  Cities in response: Fletcher, Maggie Valley, Cornelius, Fort Mill, Mount Pleasant, Waxhaw, Gastonia, China Grove, Taylorsville, Charlotte, Mooresville, Asheville, Kannapolis, Biltmore Lake, Weaverville, Rutherfordton, Arden, Terrell, Smyrna, Waynesville
+  OriginatingSystems: carolina
+  Normalized        : 500
+  After city filter : 101
+  Price/beds filter : 101
+  Returned (page)   : 1
+  Has more          : true
+[36m━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━[0m
+[36m━━━ [CitySearch] Waxhaw ━━━[0m
+  MLS returned     : 3389 total (fetched 500)
+  Cities in response: Fletcher, Maggie Valley, Cornelius, Fort Mill, Mount Pleasant, Waxhaw, Gastonia, China Grove, Taylorsville, Charlotte, Mooresville, Asheville, Kannapolis, Biltmore Lake, Weaverville, Rutherfordton, Arden, Terrell, Smyrna, Waynesville
+  OriginatingSystems: carolina
+  Normalized        : 500
+  After city filter : 11
+  Price/beds filter : 11
+  Returned (page)   : 1
+  Has more          : true
+[36m━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━[0m
+[36m━━━ [CitySearch] Concord ━━━[0m
+  MLS returned     : 3389 total (fetched 500)
+  Cities in response: Fletcher, Maggie Valley, Cornelius, Fort Mill, Mount Pleasant, Waxhaw, Gastonia, China Grove, Taylorsville, Charlotte, Mooresville, Asheville, Kannapolis, Biltmore Lake, Weaverville, Rutherfordton, Arden, Terrell, Smyrna, Waynesville
+  OriginatingSystems: carolina
+  Normalized        : 500
+  After city filter : 13
+  Price/beds filter : 13
+  Returned (page)   : 1
+  Has more          : true
+[36m━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━[0m
+[36m━━━ [CitySearch] Gastonia ━━━[0m
+  MLS returned     : 3389 total (fetched 500)
+  Cities in response: Fletcher, Maggie Valley, Cornelius, Fort Mill, Mount Pleasant, Waxhaw, Gastonia, China Grove, Taylorsville, Charlotte, Mooresville, Asheville, Kannapolis, Biltmore Lake, Weaverville, Rutherfordton, Arden, Terrell, Smyrna, Waynesville
+  OriginatingSystems: carolina
+  Normalized        : 500
+  After city filter : 9
+  Price/beds filter : 9
+  Returned (page)   : 1
+  Has more          : true
+[36m━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━[0m
+[36m━━━ [CitySearch] Rock hill ━━━[0m
+  MLS returned     : 3389 total (fetched 500)
+  Cities in response: Fletcher, Maggie Valley, Cornelius, Fort Mill, Mount Pleasant, Waxhaw, Gastonia, China Grove, Taylorsville, Charlotte, Mooresville, Asheville, Kannapolis, Biltmore Lake, Weaverville, Rutherfordton, Arden, Terrell, Smyrna, Waynesville
+  OriginatingSystems: carolina
+  Normalized        : 500
+  After city filter : 14
+  Price/beds filter : 14
+  Returned (page)   : 1
+  Has more          : true
+[36m━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━[0m
+[36m━━━ [CitySearch] Fort mill ━━━[0m
+  MLS returned     : 3389 total (fetched 500)
+  Cities in response: Fletcher, Maggie Valley, Cornelius, Fort Mill, Mount Pleasant, Waxhaw, Gastonia, China Grove, Taylorsville, Charlotte, Mooresville, Asheville, Kannapolis, Biltmore Lake, Weaverville, Rutherfordton, Arden, Terrell, Smyrna, Waynesville
+  OriginatingSystems: carolina
+  Normalized        : 500
+  After city filter : 9
+  Price/beds filter : 9
+  Returned (page)   : 1
+  Has more          : true
+[36m━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━[0m
+[36m━━━ [CitySearch] Tega cay ━━━[0m
+  MLS returned     : 3389 total (fetched 500)
+  Cities in response: Fletcher, Maggie Valley, Cornelius, Fort Mill, Mount Pleasant, Waxhaw, Gastonia, China Grove, Taylorsville, Charlotte, Mooresville, Asheville, Kannapolis, Biltmore Lake, Weaverville, Rutherfordton, Arden, Terrell, Smyrna, Waynesville
+  OriginatingSystems: carolina
+  Normalized        : 500
+  After city filter : 1
+  Price/beds filter : 1
+  Returned (page)   : 1
+  Has more          : false
+[36m━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━[0m
+[0mGET /api/cities [36m304[0m 4718.035 ms - -[0m
+[0mGET /api/properties/search?q=Waxhaw,+NC&limit=6 [32m200[0m 3404.854 ms - -[0m
+[0mGET /api/mls/open-houses/property/CAR283494324 [0m-[0m - ms - -[0m
+[0mGET /api/mls/open-houses/property/CAR283494324 [32m200[0m 358.868 ms - 68[0m
+[0mGET /api/properties/CAR283494324 [32m200[0m 1616.276 ms - -[0m
+[0mGET /api/favorites/check/CAR283494324 [32m200[0m 9.790 ms - 47[0m
+[0mGET /api/property-history/CAR283494324 [31m500[0m 12.444 ms - 72[0m
+[0mGET /api/comparisons [31m500[0m 204.474 ms - 76[0m
+[0mGET /api/recently-viewed?limit=6 [31m500[0m 291.160 ms - 71[0m
+[0mPOST /api/recently-viewed [31m500[0m 288.734 ms - 71[0m
+[0mGET /api/property-history/CAR283494324 [31m500[0m 183.396 ms - 72[0m
+[0mGET /api/recently-viewed?limit=6 [31m500[0m 131.044 ms - 71[0m
+[0mGET /api/comparisons [31m500[0m 259.047 ms - 76[0m
+[0mPOST /api/favorites/CAR283494324 [32m201[0m 552.955 ms - 177[0m
+[0mGET /api/property-history/CAR283494324 [31m500[0m 4.071 ms - 72[0m
+[0mGET /api/recently-viewed?limit=6 [31m500[0m 88.470 ms - 71[0m
+[0mGET /api/comparisons [31m500[0m 83.613 ms - 76[0m
+[0mGET /api/mls/open-houses/property/CAR283494324 [0m-[0m - ms - -[0m
+[0mGET /api/auth/me [32m200[0m 9.868 ms - 172[0m
+[0mGET /api/favorites/check/CAR283494324 [32m200[0m 27.230 ms - 87[0m
+[0mGET /api/recently-viewed?limit=6 [31m500[0m 9.382 ms - 71[0m
+[0mGET /api/comparisons [31m500[0m 189.752 ms - 76[0m
+[0mPOST /api/recently-viewed [0m-[0m - ms - -[0m
+[0mGET /api/mls/members?limit=100 [0m-[0m - ms - -[0m
+[0mGET /api/properties/CAR283494324 [0m-[0m - ms - -[0m
+[0mGET /api/mls/open-houses/property/CAR283494324 [0m-[0m - ms - -[0m
+[0mGET /api/property-history/CAR283494324 [0m-[0m - ms - -[0m
+[0mGET /api/mls/open-houses/property/CAR283494324 [0m-[0m - ms - -[0m
+[0mGET /api/properties/CAR283494324 [32m200[0m 303.289 ms - -[0m
+[0mGET /api/mls/open-houses/property/CAR283494324 [32m200[0m 363.822 ms - 68[0m
+[0mGET /api/comparisons [31m500[0m 90.470 ms - 76[0m
+[0mGET /api/property-history/CAR283494324 [31m500[0m 92.937 ms - 72[0m
+[0mGET /api/recently-viewed?limit=6 [31m500[0m 120.141 ms - 71[0m
+[0mPOST /api/recently-viewed [31m500[0m 63.941 ms - 71[0m
+[0mGET /api/mls/members?limit=100 [32m200[0m 341.016 ms - -[0m
+[0mGET /api/favorites?limit=50 [32m200[0m 19.734 ms - -[0m
+[0mGET /api/auth/me [36m304[0m 10.924 ms - -[0m
+[0mGET /api/comparisons [31m500[0m 7.963 ms - 76[0m
+[0mGET /api/mls/open-houses/property/CAR283494324 [0m-[0m - ms - -[0m
+[0mGET /api/property-history/CAR283494324 [31m500[0m 110.094 ms - 72[0m
+[0mGET /api/recently-viewed?limit=6 [31m500[0m 115.552 ms - 71[0m
+[0mGET /api/favorites/check/CAR283494324 [36m304[0m 144.768 ms - -[0m
+[0mPOST /api/recently-viewed [31m500[0m 144.549 ms - 71[0m
+[0mPOST /api/recently-viewed [31m500[0m 158.344 ms - 71[0m
+[0mGET /api/mls/open-houses/property/CAR283494324 [32m200[0m 1451.939 ms - 68[0m
+[0mGET /api/comparisons [31m500[0m 7.044 ms - 76[0m
+[0mGET /api/property-history/CAR283494324 [31m500[0m 117.206 ms - 72[0m
+[0mGET /api/recently-viewed?limit=6 [31m500[0m 120.835 ms - 71[0m
+[0mPOST /api/recently-viewed [31m500[0m 116.984 ms - 71[0m
+[0mPOST /api/recently-viewed [31m500[0m 84.659 ms - 71[0m
+[0mGET /api/favorites?limit=50 [36m304[0m 19.774 ms - -[0m
+[0mGET /api/auth/me [36m304[0m 12.058 ms - -[0m
+[0mGET /api/mls/open-houses/property/CAR283494324 [0m-[0m - ms - -[0m
+[0mGET /api/favorites/check/CAR283494324 [36m304[0m 7.147 ms - -[0m
+[0mGET /api/recently-viewed?limit=6 [31m500[0m 4.747 ms - 71[0m
+[0mGET /api/comparisons [31m500[0m 97.922 ms - 76[0m
+[0mGET /api/property-history/CAR283494324 [31m500[0m 105.779 ms - 72[0m
+[0mGET /api/properties/CAR283494324 [0m-[0m - ms - -[0m
+[0mPOST /api/recently-viewed [0m-[0m - ms - -[0m
+[0mPOST /api/recently-viewed [0m-[0m - ms - -[0m
+[0mGET /api/mls/open-houses/property/CAR283494324 [0m-[0m - ms - -[0m
+[0mGET /api/mls/open-houses/property/CAR283494324 [0m-[0m - ms - -[0m
+[0mGET /api/properties/CAR283494324 [32m200[0m 301.454 ms - -[0m
+[0mGET /api/mls/open-houses/property/CAR283494324 [32m200[0m 360.083 ms - 68[0m
+[0mGET /api/property-history/CAR283494324 [31m500[0m 105.764 ms - 72[0m
+[0mGET /api/comparisons [31m500[0m 116.443 ms - 76[0m
+[0mGET /api/recently-viewed?limit=6 [31m500[0m 113.987 ms - 71[0m
+[0mPOST /api/recently-viewed [31m500[0m 73.938 ms - 71[0m
+[0mGET /api/auth/me [36m304[0m 8.950 ms - -[0m
+[0mGET /api/favorites/check/CAR283494324 [36m304[0m 15.167 ms - -[0m
+[0mGET /api/property-history/CAR283494324 [31m500[0m 4.480 ms - 72[0m
+[0mGET /api/comparisons [31m500[0m 97.536 ms - 76[0m
+[0mGET /api/recently-viewed?limit=6 [31m500[0m 125.344 ms - 71[0m
+[0mGET /api/mls/open-houses/property/CAR283494324 [0m-[0m - ms - -[0m
+[0mPOST /api/recently-viewed [31m500[0m 104.322 ms - 71[0m
+[0mPOST /api/recently-viewed [31m500[0m 114.186 ms - 71[0m
+[0mGET /api/mls/open-houses/property/CAR283494324 [0m-[0m - ms - -[0m
+[0mGET /api/mls/open-houses/property/CAR283494324 [0m-[0m - ms - -[0m
+[0mGET /api/comparisons [31m500[0m 107.831 ms - 76[0m
+[0mPOST /api/recently-viewed [31m500[0m 130.463 ms - 71[0m
+[0mGET /api/recently-viewed?limit=6 [31m500[0m 151.064 ms - 71[0m
+[0mGET /api/property-history/CAR283494324 [31m500[0m 163.096 ms - 72[0m
+[0mPOST /api/recently-viewed [31m500[0m 175.967 ms - 71[0m
+[0mGET /api/mls/open-houses/property/CAR283494324 [32m200[0m 257.018 ms - 68[0m
+[0mGET /api/favorites?limit=50 [36m304[0m 61.824 ms - -[0m
+[0mGET /api/notifications?limit=5 [33m404[0m 0.986 ms - 74[0m
+[0mGET /api/notifications/unread-count [33m404[0m 0.851 ms - 79[0m
+[0mGET /api/notifications?page=5&limit=20 [33m404[0m 0.808 ms - 82[0m
+[0mGET /api/notifications/unread-count [33m404[0m 0.994 ms - 79[0m
+[0mGET /api/notifications?page=5&limit=20 [33m404[0m 0.775 ms - 82[0m
+[0mGET /api/comparisons [32m200[0m 13.239 ms - 26[0m
+[0mGET /api/recently-viewed?limit=6 [32m200[0m 734.856 ms - 101[0m
+[0mGET /api/property-history/CAR283494324 [32m200[0m 878.917 ms - 102[0m
+[0mGET /api/favorites?limit=50 [36m304[0m 16.633 ms - -[0m
+[0mGET /api/auth/me [36m304[0m 26.182 ms - -[0m
+[0mGET /api/mls/open-houses/property/CAR283494324 [0m-[0m - ms - -[0m
+[0mGET /api/properties/CAR283494324 [32m200[0m 1212.119 ms - -[0m
+[0mGET /api/mls/open-houses/property/CAR283494324 [32m200[0m 1286.061 ms - 68[0m
+[0mGET /api/favorites/check/CAR283494324 [36m304[0m 24.144 ms - -[0m
+[0mPOST /api/recently-viewed [32m200[0m 66.177 ms - 16[0m
+[0mGET /api/mls/members?limit=100 [36m304[0m 656.707 ms - -[0m
+[36m━━━ [CitySearch] Charlotte ━━━[0m
+  MLS returned     : 3389 total (fetched 500)
+  Cities in response: Fletcher, Maggie Valley, Cornelius, Fort Mill, Mount Pleasant, Waxhaw, Gastonia, China Grove, Taylorsville, Charlotte, Mooresville, Asheville, Kannapolis, Biltmore Lake, Weaverville, Rutherfordton, Arden, Terrell, Smyrna, Waynesville
+  OriginatingSystems: carolina
+  Normalized        : 500
+  After city filter : 101
+  Price/beds filter : 101
+  Returned (page)   : 4
+  Has more          : true
+[36m━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━[0m
+[0mGET /api/cities/charlotte?top=4 [32m200[0m 3353.610 ms - -[0m
+[0mGET /api/favorites/check/CAR291270500 [32m200[0m 4.874 ms - 47[0m
+[0mGET /api/favorites/check/CAR301682674 [32m200[0m 7.704 ms - 47[0m
+[0mGET /api/favorites/check/CAR296936469 [32m200[0m 6.745 ms - 47[0m
+[0mGET /api/favorites/check/CAR302225171 [32m200[0m 6.202 ms - 47[0m
+[0mGET /api/notifications/unread-count [33m404[0m 0.651 ms - 79[0m
+[0mGET /api/notifications/unread-count [33m404[0m 0.575 ms - 79[0m
+[0mGET /api/notifications/unread-count [33m404[0m 0.981 ms - 79[0m
+[0mGET /api/notifications?page=5&limit=20 [33m404[0m 0.959 ms - 82[0m
+[0mGET /api/notifications?page=5&limit=20 [33m404[0m 0.487 ms - 82[0m
+[0mGET /api/notifications?page=5&limit=20 [33m404[0m 0.440 ms - 82[0m
+[0mGET /api/notifications/unread-count [33m404[0m 0.448 ms - 79[0m
+[0mGET /api/notifications/unread-count [33m404[0m 1.252 ms - 79[0m
+[0mGET /api/notifications/unread-count [33m404[0m 0.456 ms - 79[0m
+[0mGET /api/favorites/check/CAR291270500 [32m200[0m 3.746 ms - 47[0m
+[0mGET /api/favorites/check/CAR296936469 [32m200[0m 2.346 ms - 47[0m
+[0mGET /api/favorites/check/CAR301682674 [32m200[0m 2.351 ms - 47[0m
+[0mGET /api/favorites/check/CAR302225171 [32m200[0m 2.532 ms - 47[0m
+[0mPOST /api/recently-viewed [32m200[0m 34.788 ms - 16[0m
+[0mGET /api/property-history/CAR283494324 [32m200[0m 10.065 ms - 102[0m
+[0mGET /api/recently-viewed?limit=6 [32m200[0m 12.215 ms - -[0m
+[0mGET /api/favorites/check/CAR283494324 [32m200[0m 490.227 ms - 87[0m
+[0mGET /api/comparisons [32m200[0m 550.989 ms - 26[0m
+[0mPOST /api/recently-viewed [32m200[0m 707.523 ms - 16[0m
+[0mGET /api/favorites/check/CAR283494324 [32m200[0m 15.359 ms - 87[0m
+[0mGET /api/mls/open-houses/property/CAR283494324 [32m200[0m 1636.345 ms - 68[0m
+[0mGET /api/properties/CAR283494324 [32m200[0m 1064.372 ms - -[0m
+[0mGET /api/mls/members?limit=100 [32m200[0m 1828.166 ms - -[0m
+[0mGET /api/mls/members?limit=100 [32m200[0m 1123.105 ms - -[0m
+[0mGET /api/recently-viewed?limit=6 [32m200[0m 10.552 ms - -[0m
+[0mGET /api/favorites?limit=50 [32m200[0m 6.952 ms - -[0m
+[0mGET /api/notifications/unread-count [33m404[0m 1.690 ms - 79[0m
+[0mGET /api/notifications/unread-count [33m404[0m 1.309 ms - 79[0m
+[0mGET /api/notifications/unread-count [33m404[0m 0.769 ms - 79[0m
+[0mGET /api/notifications?page=5&limit=20 [33m404[0m 1.971 ms - 82[0m
+[0mGET /api/notifications?page=5&limit=20 [33m404[0m 0.811 ms - 82[0m
+[0mGET /api/notifications?page=5&limit=20 [33m404[0m 1.049 ms - 82[0m
+[0mGET /api/notifications/unread-count [33m404[0m 0.726 ms - 79[0m
+[0mGET /api/notifications/unread-count [33m404[0m 0.475 ms - 79[0m
+[0mGET /api/notifications/unread-count [33m404[0m 1.212 ms - 79[0m
+[0mGET /api/properties/featured?limit=1 [32m200[0m 3863.907 ms - -[0m
+[0mGET /api/properties/featured?limit=12 [32m200[0m 2746.341 ms - -[0m
+[0mGET /api/mls/open-houses/listings?limit=12 [32m200[0m 2743.016 ms - -[0m
+[0mGET /api/favorites/check/CAR299951865 [32m200[0m 9.504 ms - 47[0m
+[0mGET /api/favorites/check/CAR303230628 [32m200[0m 2.667 ms - 47[0m
+[0mGET /api/favorites/check/CAR302863921 [32m200[0m 5.050 ms - 47[0m
+[0mGET /api/favorites/check/CAR299951865 [32m200[0m 5.370 ms - 47[0m
+[0mGET /api/favorites/check/CAR297801547 [32m200[0m 2.705 ms - 47[0m
+[0mGET /api/favorites/check/CAR291655837 [32m200[0m 2.259 ms - 47[0m
+[0mGET /api/favorites/check/CAR303530978 [32m200[0m 2.901 ms - 47[0m
+[0mGET /api/favorites/check/CAR303530978 [32m200[0m 418.237 ms - 47[0m
+[0mGET /api/favorites/check/CAR303230628 [32m200[0m 4.792 ms - 47[0m
+[0mGET /api/favorites/check/CAR302863921 [32m200[0m 11.628 ms - 47[0m
+[0mGET /api/favorites/check/CAR291655837 [32m200[0m 688.041 ms - 47[0m
+[0mGET /api/favorites/check/CAR297801547 [32m200[0m 807.787 ms - 47[0m
+[36m━━━ [CitySearch] Charlotte ━━━[0m
+  MLS returned     : 3389 total (fetched 500)
+  Cities in response: Fletcher, Maggie Valley, Cornelius, Fort Mill, Mount Pleasant, Waxhaw, Gastonia, China Grove, Taylorsville, Charlotte, Mooresville, Asheville, Kannapolis, Biltmore Lake, Weaverville, Rutherfordton, Arden, Terrell, Smyrna, Waynesville
+  OriginatingSystems: carolina
+  Normalized        : 500
+  After city filter : 101
+  Price/beds filter : 101
+  Returned (page)   : 1
+  Has more          : true
+[36m━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━[0m
+[36m━━━ [CitySearch] Waxhaw ━━━[0m
+  MLS returned     : 3389 total (fetched 500)
+  Cities in response: Fletcher, Maggie Valley, Cornelius, Fort Mill, Mount Pleasant, Waxhaw, Gastonia, China Grove, Taylorsville, Charlotte, Mooresville, Asheville, Kannapolis, Biltmore Lake, Weaverville, Rutherfordton, Arden, Terrell, Smyrna, Waynesville
+  OriginatingSystems: carolina
+  Normalized        : 500
+  After city filter : 11
+  Price/beds filter : 11
+  Returned (page)   : 1
+  Has more          : true
+[36m━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━[0m
+[36m━━━ [CitySearch] Concord ━━━[0m
+  MLS returned     : 3389 total (fetched 500)
+  Cities in response: Fletcher, Maggie Valley, Cornelius, Fort Mill, Mount Pleasant, Waxhaw, Gastonia, China Grove, Taylorsville, Charlotte, Mooresville, Asheville, Kannapolis, Biltmore Lake, Weaverville, Rutherfordton, Arden, Terrell, Smyrna, Waynesville
+  OriginatingSystems: carolina
+  Normalized        : 500
+  After city filter : 13
+  Price/beds filter : 13
+  Returned (page)   : 1
+  Has more          : true
+[36m━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━[0m
+[36m━━━ [CitySearch] Gastonia ━━━[0m
+  MLS returned     : 3389 total (fetched 500)
+  Cities in response: Fletcher, Maggie Valley, Cornelius, Fort Mill, Mount Pleasant, Waxhaw, Gastonia, China Grove, Taylorsville, Charlotte, Mooresville, Asheville, Kannapolis, Biltmore Lake, Weaverville, Rutherfordton, Arden, Terrell, Smyrna, Waynesville
+  OriginatingSystems: carolina
+  Normalized        : 500
+  After city filter : 9
+  Price/beds filter : 9
+  Returned (page)   : 1
+  Has more          : true
+[36m━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━[0m
+[36m━━━ [CitySearch] Rock hill ━━━[0m
+  MLS returned     : 3389 total (fetched 500)
+  Cities in response: Fletcher, Maggie Valley, Cornelius, Fort Mill, Mount Pleasant, Waxhaw, Gastonia, China Grove, Taylorsville, Charlotte, Mooresville, Asheville, Kannapolis, Biltmore Lake, Weaverville, Rutherfordton, Arden, Terrell, Smyrna, Waynesville
+  OriginatingSystems: carolina
+  Normalized        : 500
+  After city filter : 14
+  Price/beds filter : 14
+  Returned (page)   : 1
+  Has more          : true
+[36m━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━[0m
+[36m━━━ [CitySearch] Fort mill ━━━[0m
+  MLS returned     : 3389 total (fetched 500)
+  Cities in response: Fletcher, Maggie Valley, Cornelius, Fort Mill, Mount Pleasant, Waxhaw, Gastonia, China Grove, Taylorsville, Charlotte, Mooresville, Asheville, Kannapolis, Biltmore Lake, Weaverville, Rutherfordton, Arden, Terrell, Smyrna, Waynesville
+  OriginatingSystems: carolina
+  Normalized        : 500
+  After city filter : 9
+  Price/beds filter : 9
+  Returned (page)   : 1
+  Has more          : true
+[36m━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━[0m
+[36m━━━ [CitySearch] Tega cay ━━━[0m
+  MLS returned     : 3389 total (fetched 500)
+  Cities in response: Fletcher, Maggie Valley, Cornelius, Fort Mill, Mount Pleasant, Waxhaw, Gastonia, China Grove, Taylorsville, Charlotte, Mooresville, Asheville, Kannapolis, Biltmore Lake, Weaverville, Rutherfordton, Arden, Terrell, Smyrna, Waynesville
+  OriginatingSystems: carolina
+  Normalized        : 500
+  After city filter : 1
+  Price/beds filter : 1
+  Returned (page)   : 1
+  Has more          : false
+[36m━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━[0m
+[0mGET /api/cities [32m200[0m 4884.091 ms - 485[0m
+[0mGET /api/properties?top=1 [32m200[0m 5165.703 ms - -[0m
+[0mGET /api/mls/open-houses/property/CAR303530978 [0m-[0m - ms - -[0m
+[0mGET /api/properties/CAR303530978 [32m200[0m 1105.359 ms - -[0m
+[0mGET /api/comparisons [33m401[0m 0.968 ms - 68[0m
+[0mGET /api/property-history/CAR303530978 [32m200[0m 21.027 ms - 102[0m
+[0mGET /api/recently-viewed?limit=6 [33m401[0m 0.846 ms - 68[0m
+[0mGET /api/mls/open-houses/property/CAR303530978 [32m200[0m 1833.114 ms - 68[0m
+[0mGET /api/mls/members?limit=100 [32m200[0m 693.729 ms - -[0m
+[0mGET /api/mls/members?limit=100 [32m200[0m 602.225 ms - -[0m
+[0mGET /api/comparisons [33m401[0m 0.952 ms - 68[0m
+[0mGET /api/recently-viewed?limit=6 [33m401[0m 1.553 ms - 68[0m
+[0mGET /api/comparisons [33m401[0m 0.450 ms - 68[0m
+[0mGET /api/recently-viewed?limit=6 [33m401[0m 0.767 ms - 68[0m
+[0mGET /api/notifications/unread-count [33m404[0m 0.585 ms - 79[0m
+[0mGET /api/notifications/unread-count [33m404[0m 0.871 ms - 79[0m
+[0mGET /api/notifications/unread-count [33m404[0m 1.033 ms - 79[0m
+[0mPOST /api/comparisons [33m401[0m 0.583 ms - 68[0m
+[0mGET /api/notifications?page=5&limit=20 [33m404[0m 2.936 ms - 82[0m
+[0mGET /api/notifications?page=5&limit=20 [33m404[0m 0.980 ms - 82[0m
+[0mGET /api/notifications?page=5&limit=20 [33m404[0m 2.846 ms - 82[0m
+[0mGET /api/notifications/unread-count [33m404[0m 0.448 ms - 79[0m
+[0mGET /api/notifications/unread-count [33m404[0m 0.887 ms - 79[0m
+[0mGET /api/notifications/unread-count [33m404[0m 0.848 ms - 79[0m
+[0mGET /api/notifications/unread-count [33m404[0m 1.494 ms - 79[0m
+[0mGET /api/notifications/unread-count [33m404[0m 0.780 ms - 79[0m
+[0mGET /api/notifications/unread-count [33m404[0m 1.387 ms - 79[0m
+[0mGET /api/notifications?page=5&limit=20 [33m404[0m 0.539 ms - 82[0m
+[0mGET /api/notifications?page=5&limit=20 [33m404[0m 0.723 ms - 82[0m
+[0mGET /api/notifications?page=5&limit=20 [33m404[0m 0.863 ms - 82[0m
+[0mGET /api/notifications/unread-count [33m404[0m 3.035 ms - 79[0m
+[0mGET /api/notifications/unread-count [33m404[0m 0.404 ms - 79[0m
+[0mGET /api/notifications/unread-count [33m404[0m 1.570 ms - 79[0m
+[0mGET /api/notifications/unread-count [33m404[0m 1.412 ms - 79[0m
+[0mGET /api/notifications/unread-count [33m404[0m 1.569 ms - 79[0m
+[0mGET /api/notifications/unread-count [33m404[0m 1.284 ms - 79[0m
+[0mGET /api/notifications?page=5&limit=20 [33m404[0m 1.467 ms - 82[0m
+[0mGET /api/notifications?page=5&limit=20 [33m404[0m 0.760 ms - 82[0m
+[0mGET /api/notifications?page=5&limit=20 [33m404[0m 1.150 ms - 82[0m
+[0mGET /api/notifications/unread-count [33m404[0m 1.419 ms - 79[0m
+[0mGET /api/notifications/unread-count [33m404[0m 0.811 ms - 79[0m
+[0mGET /api/notifications/unread-count [33m404[0m 1.953 ms - 79[0m
+[0mGET /api/notifications/unread-count [33m404[0m 0.582 ms - 79[0m
+[0mGET /api/notifications/unread-count [33m404[0m 1.111 ms - 79[0m
+[0mGET /api/notifications/unread-count [33m404[0m 0.718 ms - 79[0m
+[0mGET /api/notifications?page=5&limit=20 [33m404[0m 1.258 ms - 82[0m
+[0mGET /api/notifications?page=5&limit=20 [33m404[0m 1.115 ms - 82[0m
+[0mGET /api/notifications?page=5&limit=20 [33m404[0m 0.725 ms - 82[0m
+[0mGET /api/notifications/unread-count [33m404[0m 1.588 ms - 79[0m
+[0mGET /api/notifications/unread-count [33m404[0m 0.434 ms - 79[0m
+[0mGET /api/notifications/unread-count [33m404[0m 0.663 ms - 79[0m
+[0mGET /api/notifications?page=5&limit=20 [33m404[0m 0.759 ms - 82[0m
+[0mGET /api/notifications?page=5&limit=20 [33m404[0m 0.993 ms - 82[0m
+[0mGET /api/properties/CAR303530978 [32m200[0m 2057.226 ms - -[0m
+[0mGET /api/mls/open-houses/property/CAR303530978 [32m200[0m 2186.090 ms - 68[0m
+[0mGET /api/notifications?page=5&limit=20 [33m404[0m 0.776 ms - 82[0m
+[0mGET /api/mls/open-houses/property/CAR303530978 [32m200[0m 1770.607 ms - 68[0m
+[0mGET /api/notifications/unread-count [33m404[0m 0.872 ms - 79[0m
+[0mGET /api/notifications/unread-count [33m404[0m 0.779 ms - 79[0m
+[0mGET /api/notifications/unread-count [33m404[0m 0.768 ms - 79[0m
+[0mGET /api/notifications/unread-count [33m404[0m 0.462 ms - 79[0m
+[0mGET /api/notifications/unread-count [33m404[0m 0.791 ms - 79[0m
+[0mGET /api/notifications/unread-count [33m404[0m 0.768 ms - 79[0m
+[0mGET /api/mls/open-houses/listings?limit=12 [32m200[0m 4006.158 ms - -[0m
+[0mGET /api/properties/featured?limit=1 [32m200[0m 5908.958 ms - -[0m
+[0mGET /api/properties/featured?limit=12 [32m200[0m 4737.066 ms - -[0m
+[0mGET /api/notifications?page=5&limit=20 [33m404[0m 0.697 ms - 82[0m
+[0mGET /api/properties?top=1 [32m200[0m 6053.328 ms - -[0m
+[0mGET /api/notifications?page=5&limit=20 [33m404[0m 2.650 ms - 82[0m
+[0mGET /api/properties?status=Closed&top=50 [32m200[0m 2150.285 ms - -[0m
+[36m━━━ [CitySearch] Charlotte ━━━[0m
+  MLS returned     : 3389 total (fetched 500)
+  Cities in response: Fletcher, Maggie Valley, Cornelius, Fort Mill, Mount Pleasant, Waxhaw, Gastonia, China Grove, Taylorsville, Charlotte, Mooresville, Asheville, Kannapolis, Biltmore Lake, Weaverville, Rutherfordton, Arden, Terrell, Smyrna, Waynesville
+  OriginatingSystems: carolina
+  Normalized        : 500
+  After city filter : 101
+  Price/beds filter : 101
+  Returned (page)   : 1
+  Has more          : true
+[36m━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━[0m
+[36m━━━ [CitySearch] Waxhaw ━━━[0m
+  MLS returned     : 3389 total (fetched 500)
+  Cities in response: Fletcher, Maggie Valley, Cornelius, Fort Mill, Mount Pleasant, Waxhaw, Gastonia, China Grove, Taylorsville, Charlotte, Mooresville, Asheville, Kannapolis, Biltmore Lake, Weaverville, Rutherfordton, Arden, Terrell, Smyrna, Waynesville
+  OriginatingSystems: carolina
+  Normalized        : 500
+  After city filter : 11
+  Price/beds filter : 11
+  Returned (page)   : 1
+  Has more          : true
+[36m━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━[0m
+[36m━━━ [CitySearch] Concord ━━━[0m
+  MLS returned     : 3389 total (fetched 500)
+  Cities in response: Fletcher, Maggie Valley, Cornelius, Fort Mill, Mount Pleasant, Waxhaw, Gastonia, China Grove, Taylorsville, Charlotte, Mooresville, Asheville, Kannapolis, Biltmore Lake, Weaverville, Rutherfordton, Arden, Terrell, Smyrna, Waynesville
+  OriginatingSystems: carolina
+  Normalized        : 500
+  After city filter : 13
+  Price/beds filter : 13
+  Returned (page)   : 1
+  Has more          : true
+[36m━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━[0m
+[36m━━━ [CitySearch] Gastonia ━━━[0m
+  MLS returned     : 3389 total (fetched 500)
+  Cities in response: Fletcher, Maggie Valley, Cornelius, Fort Mill, Mount Pleasant, Waxhaw, Gastonia, China Grove, Taylorsville, Charlotte, Mooresville, Asheville, Kannapolis, Biltmore Lake, Weaverville, Rutherfordton, Arden, Terrell, Smyrna, Waynesville
+  OriginatingSystems: carolina
+  Normalized        : 500
+  After city filter : 9
+  Price/beds filter : 9
+  Returned (page)   : 1
+  Has more          : true
+[36m━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━[0m
+[36m━━━ [CitySearch] Rock hill ━━━[0m
+  MLS returned     : 3389 total (fetched 500)
+  Cities in response: Fletcher, Maggie Valley, Cornelius, Fort Mill, Mount Pleasant, Waxhaw, Gastonia, China Grove, Taylorsville, Charlotte, Mooresville, Asheville, Kannapolis, Biltmore Lake, Weaverville, Rutherfordton, Arden, Terrell, Smyrna, Waynesville
+  OriginatingSystems: carolina
+  Normalized        : 500
+  After city filter : 14
+  Price/beds filter : 14
+  Returned (page)   : 1
+  Has more          : true
+[36m━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━[0m
+[36m━━━ [CitySearch] Fort mill ━━━[0m
+  MLS returned     : 3389 total (fetched 500)
+  Cities in response: Fletcher, Maggie Valley, Cornelius, Fort Mill, Mount Pleasant, Waxhaw, Gastonia, China Grove, Taylorsville, Charlotte, Mooresville, Asheville, Kannapolis, Biltmore Lake, Weaverville, Rutherfordton, Arden, Terrell, Smyrna, Waynesville
+  OriginatingSystems: carolina
+  Normalized        : 500
+  After city filter : 9
+  Price/beds filter : 9
+  Returned (page)   : 1
+  Has more          : true
+[36m━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━[0m
+[36m━━━ [CitySearch] Tega cay ━━━[0m
+  MLS returned     : 3389 total (fetched 500)
+  Cities in response: Fletcher, Maggie Valley, Cornelius, Fort Mill, Mount Pleasant, Waxhaw, Gastonia, China Grove, Taylorsville, Charlotte, Mooresville, Asheville, Kannapolis, Biltmore Lake, Weaverville, Rutherfordton, Arden, Terrell, Smyrna, Waynesville
+  OriginatingSystems: carolina
+  Normalized        : 500
+  After city filter : 1
+  Price/beds filter : 1
+  Returned (page)   : 1
+  Has more          : false
+[36m━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━[0m
+[0mGET /api/cities [32m200[0m 10275.374 ms - 485[0m
+[0mGET /api/notifications?page=5&limit=20 [33m404[0m 0.863 ms - 82[0m
+[0mGET /api/mls/open-houses/listings?limit=50 [32m200[0m 5079.608 ms - -[0m
+[0mGET /api/properties?status=Active&top=100 [32m200[0m 7205.348 ms - -[0m
+[0mGET /api/notifications/unread-count [33m404[0m 0.893 ms - 79[0m
+[0mGET /api/notifications/unread-count [33m404[0m 0.583 ms - 79[0m
+[0mGET /api/notifications/unread-count [33m404[0m 0.697 ms - 79[0m
+[0mGET /api/notifications/unread-count [33m404[0m 1.292 ms - 79[0m
+[0mGET /api/notifications/unread-count [33m404[0m 0.776 ms - 79[0m
+[0mGET /api/notifications/unread-count [33m404[0m 0.717 ms - 79[0m
+[0mGET /api/notifications?page=5&limit=20 [33m404[0m 2.829 ms - 82[0m
+[0mGET /api/notifications?page=5&limit=20 [33m404[0m 0.497 ms - 82[0m
+[0mGET /api/notifications?page=5&limit=20 [33m404[0m 0.687 ms - 82[0m
+[0mGET /api/notifications/unread-count [33m404[0m 1.035 ms - 79[0m
+[0mGET /api/notifications/unread-count [33m404[0m 0.668 ms - 79[0m
+[0mGET /api/properties?status=Closed&top=50 [32m200[0m 3148.123 ms - -[0m
+[0mGET /api/properties?status=Active&top=100 [0m-[0m - ms - -[0m
+[0mGET /api/favorites?limit=50 [33m401[0m 0.836 ms - 68[0m
+[0mGET /api/notifications?page=5&limit=20 [33m404[0m 1.536 ms - 82[0m
+[0mGET /api/notifications/unread-count [33m404[0m 0.835 ms - 79[0m
+[0mGET /api/favorites?limit=50 [33m401[0m 0.674 ms - 68[0m
+[0mGET /api/notifications?page=5&limit=20 [33m404[0m 0.917 ms - 82[0m
+[0mGET /api/notifications/unread-count [33m404[0m 0.677 ms - 79[0m
+[0mGET /api/properties?status=Closed&top=50 [32m200[0m 1148.280 ms - -[0m
+[0mGET /api/notifications?page=5&limit=20 [33m404[0m 0.585 ms - 82[0m
+[0mGET /api/notifications/unread-count [33m404[0m 0.716 ms - 79[0m
+[0mGET /api/properties?status=Active&top=100 [32m200[0m 2403.471 ms - -[0m
+[0mGET /api/mls/open-houses/listings?limit=50 [32m200[0m 3964.525 ms - -[0m
+[0mGET /api/properties?status=Closed&top=50 [32m200[0m 4310.851 ms - -[0m
+[0mGET /api/properties?status=Active&top=100 [32m200[0m 5603.189 ms - -[0m
+[0mGET /api/properties/featured?limit=20 [32m200[0m 757.169 ms - -[0m
+[0mGET /api/notifications?page=5&limit=20 [33m404[0m 0.563 ms - 82[0m
+[0mGET /api/notifications/unread-count [33m404[0m 0.951 ms - 79[0m
+[0mGET /api/notifications?page=5&limit=20 [33m404[0m 0.981 ms - 82[0m
+[0mGET /api/notifications/unread-count [33m404[0m 1.394 ms - 79[0m
+[0mGET /api/notifications?page=5&limit=20 [33m404[0m 0.945 ms - 82[0m
+[0mGET /api/notifications/unread-count [33m404[0m 0.672 ms - 79[0m
+[0mGET /api/notifications/unread-count [33m404[0m 1.107 ms - 79[0m
+[0mGET /api/notifications/unread-count [33m404[0m 0.803 ms - 79[0m
+[0mGET /api/notifications/unread-count [33m404[0m 0.985 ms - 79[0m
+[0mGET /api/notifications/unread-count [33m404[0m 11.091 ms - 79[0m
+[0mGET /api/notifications?page=5&limit=20 [33m404[0m 0.794 ms - 82[0m
+[0mGET /api/notifications/unread-count [33m404[0m 0.704 ms - 79[0m
+[0mGET /api/notifications?page=5&limit=20 [33m404[0m 1.113 ms - 82[0m
+[0mGET /api/favorites?limit=50 [33m401[0m 4.021 ms - 68[0m
+[0mGET /api/properties/featured?limit=1 [36m304[0m 4092.531 ms - -[0m
+[0mGET /api/favorites?limit=50 [33m401[0m 1.221 ms - 68[0m
+[0mGET /api/notifications?page=5&limit=20 [33m404[0m 1.248 ms - 82[0m
+[0mGET /api/notifications/unread-count [33m404[0m 1.354 ms - 79[0m
+[0mGET /api/properties?top=1 [36m304[0m 2915.851 ms - -[0m
+[0mGET /api/mls/open-houses/listings?limit=12 [32m200[0m 1156.542 ms - -[0m
+[0mGET /api/properties/featured?limit=12 [32m200[0m 3721.283 ms - -[0m
+[36m━━━ [CitySearch] Charlotte ━━━[0m
+  MLS returned     : 3389 total (fetched 500)
+  Cities in response: Fletcher, Maggie Valley, Cornelius, Fort Mill, Mount Pleasant, Waxhaw, Gastonia, China Grove, Taylorsville, Charlotte, Mooresville, Asheville, Kannapolis, Biltmore Lake, Weaverville, Rutherfordton, Arden, Terrell, Smyrna, Waynesville
+  OriginatingSystems: carolina
+  Normalized        : 500
+  After city filter : 101
+  Price/beds filter : 101
+  Returned (page)   : 1
+  Has more          : true
+[36m━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━[0m
+[36m━━━ [CitySearch] Waxhaw ━━━[0m
+  MLS returned     : 3389 total (fetched 500)
+  Cities in response: Fletcher, Maggie Valley, Cornelius, Fort Mill, Mount Pleasant, Waxhaw, Gastonia, China Grove, Taylorsville, Charlotte, Mooresville, Asheville, Kannapolis, Biltmore Lake, Weaverville, Rutherfordton, Arden, Terrell, Smyrna, Waynesville
+  OriginatingSystems: carolina
+  Normalized        : 500
+  After city filter : 11
+  Price/beds filter : 11
+  Returned (page)   : 1
+  Has more          : true
+[36m━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━[0m
+[36m━━━ [CitySearch] Concord ━━━[0m
+  MLS returned     : 3389 total (fetched 500)
+  Cities in response: Fletcher, Maggie Valley, Cornelius, Fort Mill, Mount Pleasant, Waxhaw, Gastonia, China Grove, Taylorsville, Charlotte, Mooresville, Asheville, Kannapolis, Biltmore Lake, Weaverville, Rutherfordton, Arden, Terrell, Smyrna, Waynesville
+  OriginatingSystems: carolina
+  Normalized        : 500
+  After city filter : 13
+  Price/beds filter : 13
+  Returned (page)   : 1
+  Has more          : true
+[36m━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━[0m
+[36m━━━ [CitySearch] Gastonia ━━━[0m
+  MLS returned     : 3389 total (fetched 500)
+  Cities in response: Fletcher, Maggie Valley, Cornelius, Fort Mill, Mount Pleasant, Waxhaw, Gastonia, China Grove, Taylorsville, Charlotte, Mooresville, Asheville, Kannapolis, Biltmore Lake, Weaverville, Rutherfordton, Arden, Terrell, Smyrna, Waynesville
+  OriginatingSystems: carolina
+  Normalized        : 500
+  After city filter : 9
+  Price/beds filter : 9
+  Returned (page)   : 1
+  Has more          : true
+[36m━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━[0m
+[36m━━━ [CitySearch] Rock hill ━━━[0m
+  MLS returned     : 3389 total (fetched 500)
+  Cities in response: Fletcher, Maggie Valley, Cornelius, Fort Mill, Mount Pleasant, Waxhaw, Gastonia, China Grove, Taylorsville, Charlotte, Mooresville, Asheville, Kannapolis, Biltmore Lake, Weaverville, Rutherfordton, Arden, Terrell, Smyrna, Waynesville
+  OriginatingSystems: carolina
+  Normalized        : 500
+  After city filter : 14
+  Price/beds filter : 14
+  Returned (page)   : 1
+  Has more          : true
+[36m━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━[0m
+[36m━━━ [CitySearch] Fort mill ━━━[0m
+  MLS returned     : 3389 total (fetched 500)
+  Cities in response: Fletcher, Maggie Valley, Cornelius, Fort Mill, Mount Pleasant, Waxhaw, Gastonia, China Grove, Taylorsville, Charlotte, Mooresville, Asheville, Kannapolis, Biltmore Lake, Weaverville, Rutherfordton, Arden, Terrell, Smyrna, Waynesville
+  OriginatingSystems: carolina
+  Normalized        : 500
+  After city filter : 9
+  Price/beds filter : 9
+  Returned (page)   : 1
+  Has more          : true
+[36m━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━[0m
+[36m━━━ [CitySearch] Tega cay ━━━[0m
+  MLS returned     : 3389 total (fetched 500)
+  Cities in response: Fletcher, Maggie Valley, Cornelius, Fort Mill, Mount Pleasant, Waxhaw, Gastonia, China Grove, Taylorsville, Charlotte, Mooresville, Asheville, Kannapolis, Biltmore Lake, Weaverville, Rutherfordton, Arden, Terrell, Smyrna, Waynesville
+  OriginatingSystems: carolina
+  Normalized        : 500
+  After city filter : 1
+  Price/beds filter : 1
+  Returned (page)   : 1
+  Has more          : false
+[36m━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━[0m
+[0mGET /api/cities [36m304[0m 3996.502 ms - -[0m
+[0mGET /api/properties?status=Closed&top=4 [32m200[0m 2764.385 ms - -[0m
+[0mGET /api/properties?type=&minPrice=&maxPrice=&beds=&sort=newest&top=24&status=for-sale [32m200[0m 3162.114 ms - -[0m
+[0mGET /api/mls/open-houses/property/CAR299951865 [32m200[0m 932.631 ms - 68[0m
+[0mGET /api/properties/CAR299951865 [32m200[0m 1929.876 ms - -[0m
+[0mGET /api/comparisons [33m401[0m 1.037 ms - 68[0m
+[0mGET /api/recently-viewed?limit=6 [33m401[0m 0.768 ms - 68[0m
+[0mGET /api/property-history/CAR299951865 [32m200[0m 34.038 ms - 102[0m
+[0mGET /api/mls/members?limit=100 [36m304[0m 675.635 ms - -[0m
+[0mGET /api/comparisons [33m401[0m 1.198 ms - 68[0m
+[0mGET /api/recently-viewed?limit=6 [33m401[0m 1.576 ms - 68[0m
+[0mGET /api/comparisons [33m401[0m 0.874 ms - 68[0m
+[0mGET /api/recently-viewed?limit=6 [33m401[0m 0.513 ms - 68[0m
+[0mGET /api/notifications?page=5&limit=20 [33m404[0m 3.733 ms - 82[0m
+[0mGET /api/notifications/unread-count [33m404[0m 0.870 ms - 79[0m
+[0mGET /api/notifications?page=5&limit=20 [33m404[0m 1.479 ms - 82[0m
+[0mGET /api/notifications/unread-count [33m404[0m 1.570 ms - 79[0m
+[0mGET /api/notifications?page=5&limit=20 [33m404[0m 0.543 ms - 82[0m
+[0mGET /api/notifications/unread-count [33m404[0m 1.094 ms - 79[0m
+[0mGET /api/notifications?page=5&limit=20 [33m404[0m 0.922 ms - 82[0m
+[0mGET /api/notifications/unread-count [33m404[0m 1.798 ms - 79[0m
+[0mGET /api/favorites?limit=50 [33m401[0m 2.660 ms - 68[0m
+[0mGET /api/notifications?page=5&limit=20 [33m404[0m 2.748 ms - 82[0m
+[0mGET /api/notifications/unread-count [33m404[0m 0.820 ms - 79[0m
+[0mGET /api/favorites?limit=50 [33m401[0m 1.151 ms - 68[0m
+[0mGET /api/notifications?page=5&limit=20 [33m404[0m 0.939 ms - 82[0m
+[0mGET /api/notifications/unread-count [33m404[0m 0.678 ms - 79[0m
+[0mGET /api/notifications?page=5&limit=20 [33m404[0m 1.151 ms - 82[0m
+[0mGET /api/notifications/unread-count [33m404[0m 0.985 ms - 79[0m
+[0mGET /api/properties/featured?limit=1 [32m200[0m 3711.508 ms - -[0m
+[0mGET /api/mls/open-houses/listings?limit=12 [32m200[0m 2483.222 ms - -[0m
+[0mGET /api/properties?top=1 [32m200[0m 3447.855 ms - -[0m
+[0mGET /api/properties/featured?limit=12 [32m200[0m 3797.356 ms - -[0m
+[0mGET /api/favorites?limit=50 [33m401[0m 0.913 ms - 68[0m
+[0mGET /api/notifications?page=5&limit=20 [33m404[0m 0.988 ms - 82[0m
+[0mGET /api/notifications/unread-count [33m404[0m 0.562 ms - 79[0m
+[0mGET /api/favorites?limit=50 [33m401[0m 1.166 ms - 68[0m
+[0mGET /api/notifications?page=5&limit=20 [33m404[0m 0.780 ms - 82[0m
+[0mGET /api/notifications/unread-count [33m404[0m 2.560 ms - 79[0m
+[0mGET /api/notifications?page=5&limit=20 [33m404[0m 1.514 ms - 82[0m
+[0mGET /api/notifications/unread-count [33m404[0m 0.919 ms - 79[0m
+[0mGET /api/properties/featured?limit=1 [32m200[0m 3204.622 ms - -[0m
+[0mGET /api/notifications/unread-count [33m404[0m 1.797 ms - 79[0m
+[0mGET /api/notifications/unread-count [33m404[0m 0.775 ms - 79[0m
+[0mGET /api/notifications/unread-count [33m404[0m 0.834 ms - 79[0m
+[0mGET /api/notifications?page=5&limit=20 [33m404[0m 0.454 ms - 82[0m
+[0mGET /api/notifications?page=5&limit=20 [33m404[0m 2.615 ms - 82[0m
+[0mGET /api/notifications?page=5&limit=20 [33m404[0m 2.560 ms - 82[0m
+[0mGET /api/notifications/unread-count [33m404[0m 0.677 ms - 79[0m
+[0mGET /api/notifications/unread-count [33m404[0m 2.434 ms - 79[0m
+[0mGET /api/notifications/unread-count [33m404[0m 0.495 ms - 79[0m
+[0mGET /api/notifications?page=5&limit=20 [33m404[0m 1.717 ms - 82[0m
+[0mGET /api/notifications?page=5&limit=20 [33m404[0m 1.776 ms - 82[0m
+[0mGET /api/notifications?page=5&limit=20 [33m404[0m 1.006 ms - 82[0m
+[0mGET /api/notifications/unread-count [33m404[0m 0.664 ms - 79[0m
+[0mGET /api/notifications/unread-count [33m404[0m 1.847 ms - 79[0m
+[0mGET /api/notifications/unread-count [33m404[0m 0.580 ms - 79[0m
+[0mGET /api/notifications?page=5&limit=20 [33m404[0m 0.994 ms - 82[0m
+[0mGET /api/notifications/unread-count [33m404[0m 1.031 ms - 79[0m
+[0mGET /api/properties/featured?limit=1 [32m200[0m 3896.331 ms - -[0m
+[0mGET /api/notifications/unread-count [33m404[0m 1.206 ms - 79[0m
+[0mGET /api/notifications/unread-count [33m404[0m 0.546 ms - 79[0m
+[0mGET /api/notifications/unread-count [33m404[0m 0.613 ms - 79[0m
+[0mGET /api/notifications/unread-count [33m404[0m 2.617 ms - 79[0m
+[0mGET /api/notifications/unread-count [33m404[0m 0.666 ms - 79[0m
+[0mGET /api/notifications/unread-count [33m404[0m 0.966 ms - 79[0m
+[0mGET /api/notifications/unread-count [33m404[0m 0.710 ms - 79[0m
+[0mGET /api/notifications/unread-count [33m404[0m 1.395 ms - 79[0m
+[0mGET /api/notifications?page=5&limit=20 [33m404[0m 0.625 ms - 82[0m
+[0mGET /api/notifications?page=5&limit=20 [33m404[0m 0.852 ms - 82[0m
+[0mGET /api/notifications?page=5&limit=20 [33m404[0m 0.816 ms - 82[0m
+[0mGET /api/notifications/unread-count [33m404[0m 1.930 ms - 79[0m
+[0mGET /api/notifications/unread-count [33m404[0m 4.783 ms - 79[0m
+[0mGET /api/notifications/unread-count [33m404[0m 1.272 ms - 79[0m
+[0mGET /api/notifications/unread-count [33m404[0m 0.436 ms - 79[0m
+[0mGET /api/notifications/unread-count [33m404[0m 0.762 ms - 79[0m
+[0mGET /api/notifications/unread-count [33m404[0m 2.574 ms - 79[0m
+[0mGET /api/notifications?page=5&limit=20 [33m404[0m 0.867 ms - 82[0m
+[0mGET /api/notifications?page=5&limit=20 [33m404[0m 1.045 ms - 82[0m
+[0mGET /api/notifications?page=5&limit=20 [33m404[0m 1.192 ms - 82[0m
+[0mGET /api/notifications/unread-count [33m404[0m 0.732 ms - 79[0m
+[0mGET /api/notifications/unread-count [33m404[0m 0.616 ms - 79[0m
+[0mGET /api/notifications/unread-count [33m404[0m 2.091 ms - 79[0m
+[0mGET /api/notifications/unread-count [33m404[0m 2.302 ms - 79[0m
+[0mGET /api/properties/featured?limit=1 [0m-[0m - ms - -[0m
+[0mGET /api/favorites?limit=50 [33m401[0m 1.209 ms - 68[0m
+[0mGET /api/notifications?page=5&limit=20 [33m404[0m 0.677 ms - 82[0m
+[0mGET /api/notifications/unread-count [33m404[0m 0.627 ms - 79[0m
+[0mGET /api/favorites?limit=50 [33m401[0m 1.232 ms - 68[0m
+[0mGET /api/notifications?page=5&limit=20 [33m404[0m 0.637 ms - 82[0m
+[0mGET /api/notifications/unread-count [33m404[0m 0.779 ms - 79[0m
+[0mGET /api/properties/featured?limit=1 [32m200[0m 2198.085 ms - -[0m
+[0mGET /api/properties/featured?limit=1 [32m200[0m 3155.866 ms - -[0m
+[0mGET /api/favorites?limit=50 [33m401[0m 31.830 ms - 68[0m
+[0mGET /api/notifications?page=5&limit=20 [33m404[0m 0.863 ms - 82[0m
+[0mGET /api/notifications/unread-count [33m404[0m 1.108 ms - 79[0m
+[0mGET /api/favorites?limit=50 [33m401[0m 0.651 ms - 68[0m
+[0mGET /api/notifications?page=5&limit=20 [33m404[0m 1.584 ms - 82[0m
+[0mGET /api/notifications/unread-count [33m404[0m 1.457 ms - 79[0m
+[0mGET /api/notifications?page=5&limit=20 [33m404[0m 0.780 ms - 82[0m
+[0mGET /api/notifications/unread-count [33m404[0m 1.657 ms - 79[0m
+[0mGET /api/properties/featured?limit=1 [32m200[0m 3455.287 ms - -[0m
+[0mGET /api/properties?top=1 [32m200[0m 1179.929 ms - -[0m
+[0mGET /api/notifications/unread-count [33m404[0m 0.599 ms - 79[0m
+[0mGET /api/notifications/unread-count [33m404[0m 0.638 ms - 79[0m
+[0mGET /api/notifications/unread-count [33m404[0m 3.854 ms - 79[0m
+[0mGET /api/favorites?limit=50 [33m401[0m 0.925 ms - 68[0m
+[0mGET /api/notifications?page=5&limit=20 [33m404[0m 1.421 ms - 82[0m
+[0mGET /api/notifications/unread-count [33m404[0m 0.915 ms - 79[0m
+[0mGET /api/favorites?limit=50 [33m401[0m 0.864 ms - 68[0m
+[0mGET /api/notifications?page=5&limit=20 [33m404[0m 0.816 ms - 82[0m
+[0mGET /api/notifications/unread-count [33m404[0m 0.925 ms - 79[0m
+[0mGET /api/notifications?page=5&limit=20 [33m404[0m 0.480 ms - 82[0m
+[0mGET /api/notifications/unread-count [33m404[0m 2.614 ms - 79[0m
+[0mGET /api/properties/featured?limit=1 [32m200[0m 4421.983 ms - -[0m
+[0mGET /api/mls/open-houses/listings?limit=12 [32m200[0m 2484.333 ms - -[0m
+[0mGET /api/properties/featured?limit=12 [32m200[0m 3836.360 ms - -[0m
+[0mGET /api/properties?top=1 [32m200[0m 4128.176 ms - -[0m
+[0mGET /api/favorites?limit=50 [33m401[0m 13.737 ms - 68[0m
+[0mGET /api/notifications?page=5&limit=20 [33m404[0m 1.120 ms - 82[0m
+[0mGET /api/notifications/unread-count [33m404[0m 1.225 ms - 79[0m
+[0mGET /api/favorites?limit=50 [33m401[0m 0.759 ms - 68[0m
+[0mGET /api/notifications?page=5&limit=20 [33m404[0m 0.727 ms - 82[0m
+[0mGET /api/notifications/unread-count [33m404[0m 3.414 ms - 79[0m
+[0mGET /api/properties/featured?limit=1 [32m200[0m 2847.635 ms - -[0m
+[0mGET /api/notifications?page=5&limit=20 [33m404[0m 2.050 ms - 82[0m
+[0mGET /api/notifications/unread-count [33m404[0m 0.976 ms - 79[0m
+[0mGET /api/notifications?page=5&limit=20 [33m404[0m 1.095 ms - 82[0m
+[0mGET /api/notifications/unread-count [33m404[0m 0.732 ms - 79[0m
+[0mGET /api/notifications?page=5&limit=20 [33m404[0m 2.621 ms - 82[0m
+[0mGET /api/notifications/unread-count [33m404[0m 0.790 ms - 79[0m
+[0mGET /api/notifications?page=5&limit=20 [33m404[0m 0.539 ms - 82[0m
+[0mGET /api/notifications/unread-count [33m404[0m 0.484 ms - 79[0m
+[0mGET /api/favorites?limit=50 [33m401[0m 1.006 ms - 68[0m
+[0mGET /api/notifications?page=5&limit=20 [33m404[0m 1.153 ms - 82[0m
+[0mGET /api/notifications/unread-count [33m404[0m 0.768 ms - 79[0m
+[0mGET /api/favorites?limit=50 [33m401[0m 1.879 ms - 68[0m
+[0mGET /api/notifications?page=5&limit=20 [33m404[0m 0.988 ms - 82[0m
+[0mGET /api/notifications/unread-count [33m404[0m 0.885 ms - 79[0m
+[0mGET /api/notifications?page=5&limit=20 [33m404[0m 1.132 ms - 82[0m
+[0mGET /api/notifications/unread-count [33m404[0m 1.398 ms - 79[0m
+[0mGET /api/properties/featured?limit=1 [32m200[0m 3836.294 ms - -[0m
+[0mGET /api/properties?top=1 [36m304[0m 1040.080 ms - -[0m
+[0mGET /api/properties/featured?limit=12 [0m-[0m - ms - -[0m
+[0mGET /api/mls/open-houses/listings?limit=12 [32m200[0m 1560.053 ms - -[0m
+[0mGET /api/properties?type=&minPrice=&maxPrice=&beds=&sort=newest&top=24&status=for-sale [32m200[0m 1033.458 ms - -[0m
+[0mGET /api/properties?status=Closed&top=4 [32m200[0m 3503.085 ms - -[0m
+[0mGET /api/properties/CAR303675026 [32m200[0m 835.265 ms - -[0m
+[0mGET /api/comparisons [33m401[0m 1.099 ms - 68[0m
+[0mGET /api/recently-viewed?limit=6 [33m401[0m 0.541 ms - 68[0m
+[0mGET /api/property-history/CAR303675026 [32m200[0m 10.106 ms - 102[0m
+[0mGET /api/mls/members?limit=100 [32m200[0m 632.721 ms - -[0m
+[0mGET /api/mls/open-houses/property/CAR303675026 [32m200[0m 1825.568 ms - 68[0m
+[0mGET /api/comparisons [33m401[0m 0.607 ms - 68[0m
+[0mGET /api/recently-viewed?limit=6 [33m401[0m 0.510 ms - 68[0m
+[0mGET /api/comparisons [33m401[0m 0.715 ms - 68[0m
+[0mGET /api/recently-viewed?limit=6 [33m401[0m 0.492 ms - 68[0m
+[0mGET /api/notifications?page=5&limit=20 [33m404[0m 5.989 ms - 82[0m
+[0mGET /api/notifications/unread-count [33m404[0m 0.629 ms - 79[0m
+[0mGET /api/notifications?page=5&limit=20 [33m404[0m 56.295 ms - 82[0m
+[0mGET /api/favorites?limit=50 [33m401[0m 3.122 ms - 68[0m
+[0mGET /api/notifications/unread-count [33m404[0m 2.215 ms - 79[0m
+[0mGET /api/properties/featured?limit=1 [32m200[0m 4017.291 ms - -[0m
+[0mGET /api/favorites?limit=50 [33m401[0m 84.362 ms - 68[0m
+[0mGET /api/notifications?page=5&limit=20 [33m404[0m 2.104 ms - 82[0m
+[0mGET /api/notifications/unread-count [33m404[0m 1.362 ms - 79[0m
+[0mGET /api/notifications?page=5&limit=20 [33m404[0m 67.863 ms - 82[0m
+[0mGET /api/notifications/unread-count [33m404[0m 10.894 ms - 79[0m
+[0mGET /api/properties?top=1 [32m200[0m 4073.728 ms - -[0m
+[0mPOST /api/auth/login [32m200[0m 738.327 ms - 425[0m
+[0mGET /api/notifications?page=5&limit=20 [33m404[0m 0.817 ms - 82[0m
+[0mGET /api/notifications/unread-count [33m404[0m 1.131 ms - 79[0m
+[0mGET /api/notifications?page=5&limit=20 [33m404[0m 1.829 ms - 82[0m
+[0mGET /api/notifications/unread-count [33m404[0m 4.082 ms - 79[0m
+[0mGET /api/notifications?page=5&limit=20 [33m404[0m 0.482 ms - 82[0m
+[0mGET /api/notifications/unread-count [33m404[0m 0.975 ms - 79[0m
+[0mGET /api/properties/featured?limit=1 [32m200[0m 4026.652 ms - -[0m
+[0mGET /api/properties?top=1 [32m200[0m 5690.871 ms - -[0m
+[0mGET /api/notifications?page=5&limit=20 [33m404[0m 0.632 ms - 82[0m
+[0mGET /api/notifications/unread-count [33m404[0m 1.890 ms - 79[0m

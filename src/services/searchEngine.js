@@ -25,20 +25,51 @@ const FILTERABLE_FIELDS = new Set([
   'ModificationTimestamp',
 ]);
 
-// Primary brokerage configuration
+// MLS Grid PropertyType is a strict enumeration. Any value outside this set
+// causes the backend to return "Invalid PropertyType enumeration given" (400),
+// which surfaces as a 500 to clients. Values verified against live data.
+const VALID_PROPERTY_TYPES = new Set([
+  'Commercial Lease',
+  'Commercial Sale',
+  'Land',
+  'Residential',
+  'Residential Income',
+  'Residential Lease',
+]);
+
+/**
+ * Parse a propertyType value (possibly comma-separated, e.g.
+ * "Residential,Residential Income") into individual types and report
+ * whether every part is a valid MLS Grid PropertyType enumeration.
+ *
+ * @param {*} value
+ * @returns {{ types: string[], valid: boolean }}
+ */
+function parsePropertyTypes(value) {
+  const types = String(value || '')
+    .split(',')
+    .map(s => s.trim())
+    .filter(Boolean);
+  return {
+    types,
+    valid: types.length > 0 && types.every(t => VALID_PROPERTY_TYPES.has(t)),
+  };
+}
+
+const config = require('../config');
+
 const BROKERAGE = {
-  FIRM_LICENSE: 'C41930',
-  LIST_OFFICE_MLS_ID: 'C41930',     // May differ from firm license in production
-  NAME: 'Vasu Realty',
-  ADDRESS: '100 Waxhaw Pkwy, Ste 93, Waxhaw, NC 28173',
-  SECONDARY_FIRM_LICENSE: 'C26375',
-  SECONDARY_ADDRESS: '3540 Toringdon Way, #200, Charlotte, NC 28277',
+  FIRM_LICENSE: config.FIRM_LICENSE,
+  LIST_OFFICE_MLS_ID: config.LIST_OFFICE_MLS_ID,
+  NAME: config.BROKERAGE_NAME,
+  ADDRESS: config.BROKERAGE_ADDRESS,
+  SECONDARY_FIRM_LICENSE: config.SECONDARY_FIRM_LICENSE,
+  SECONDARY_ADDRESS: config.BROKERAGE_SECONDARY_ADDRESS,
 };
 
-// Agent licenses
 const AGENTS = {
-  NC_LICENSE: '328293',
-  SC_LICENSE: '128069',
+  NC_LICENSE: config.NC_AGENT_LICENSE,
+  SC_LICENSE: config.SC_AGENT_LICENSE,
 };
 
 /**
@@ -216,6 +247,18 @@ function buildSearchFilters(searchResult, extraParams = {}) {
     }
   }
 
+  // Handle property type (filterable in MLS Grid) alongside the free-text
+  // search term so combined searches like "q=28216&propertyType=Residential"
+  // return only listings of that type.
+  if (extraParams.propertyType) {
+    const { types, valid } = parsePropertyTypes(extraParams.propertyType);
+    if (valid) {
+      mlsFilters.propertyType = types.length === 1 ? types[0] : types;
+    } else {
+      mlsFilters._invalidPropertyType = String(extraParams.propertyType);
+    }
+  }
+
   // Map search type → MLS filterable field or local filter
   switch (searchResult.type) {
     case 'listingId':
@@ -342,6 +385,8 @@ module.exports = {
   isPreciseFilter,
   getFetchLimit,
   FILTERABLE_FIELDS,
+  VALID_PROPERTY_TYPES,
+  parsePropertyTypes,
   BROKERAGE,
   AGENTS,
 };

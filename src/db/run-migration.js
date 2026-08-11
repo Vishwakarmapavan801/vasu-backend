@@ -6,6 +6,8 @@
  * Run: node src/db/run-migration.js
  */
 
+require('dotenv').config();
+
 const fs = require('fs');
 const path = require('path');
 const pool = require('../config/database');

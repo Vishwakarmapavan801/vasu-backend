@@ -17,7 +17,7 @@
  */
 
 const nodemailer = require('nodemailer');
-const { EMAIL_FROM, EMAIL_TO } = require('../config');
+const { EMAIL_FROM, EMAIL_TO, CLIENT_URL } = require('../config');
 
 // ================================================================
 // Transporter
@@ -60,6 +60,20 @@ function getTransporter() {
 }
 
 // ================================================================
+// HTML Escaping Helper
+// ================================================================
+
+function escapeHtml(str) {
+  if (typeof str !== 'string') return str;
+  return str
+    .replace(/&/g, '&amp;')
+    .replace(/</g, '&lt;')
+    .replace(/>/g, '&gt;')
+    .replace(/"/g, '&quot;')
+    .replace(/'/g, '&#39;');
+}
+
+// ================================================================
 // Send helper (fire-and-forget — never throws)
 // ================================================================
 
@@ -75,6 +89,26 @@ async function sendEmail({ to, subject, html, replyTo }) {
     // Never throw — email failures must not affect the user's submission
     return null;
   }
+}
+
+async function sendPasswordResetEmail({ to, name, resetToken }) {
+  const resetUrl = `${CLIENT_URL}/reset-password/${resetToken}`;
+  const html = `
+    <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto; padding: 24px;">
+      <h2 style="color: #c8102e;">Reset your Vasu Realty password</h2>
+      <p>Hello ${escapeHtml(name) || 'there'},</p>
+      <p>We received a request to reset the password for your Vasu Realty account.</p>
+      <p><a href="${resetUrl}" style="display: inline-block; background: #c8102e; color: #fff; padding: 12px 20px; text-decoration: none; border-radius: 6px;">Reset Password</a></p>
+      <p>If you did not request this, you can safely ignore this email.</p>
+      <p>This link will expire in 1 hour.</p>
+    </div>`;
+
+  return sendEmail({
+    to,
+    subject: 'Reset your Vasu Realty password',
+    html,
+    replyTo: EMAIL_FROM || 'noreply@vasurealty.com',
+  });
 }
 
 // ================================================================
@@ -122,10 +156,11 @@ function wrapHtml(bodyContent) {
 
 function field(label, value) {
   if (!value && value !== 0) return '';
+  const escaped = typeof value === 'string' ? escapeHtml(value).replace(/\n/g, '<br>') : value;
   return `
     <div class="field">
-      <div class="field-label">${label}</div>
-      <div class="field-value">${typeof value === 'string' ? value.replace(/\n/g, '<br>') : value}</div>
+      <div class="field-label">${escapeHtml(label)}</div>
+      <div class="field-value">${escaped}</div>
     </div>`;
 }
 
@@ -171,7 +206,11 @@ function propertyAgentTemplate(data) {
     ${field('Property Address', data.propertyAddress)}
     ${field('MLS ID / Listing ID', data.listingId || data.listingKey)}
     ${field('Listing Price', formatPrice(data.listingPrice))}
-    ${field('Property URL', data.propertyUrl ? `<a href="${data.propertyUrl}" style="color:#c8102e;">${data.propertyUrl}</a>` : '')}
+    ${data.propertyUrl ? `
+    <div class="field">
+      <div class="field-label">Property URL</div>
+      <div class="field-value"><a href="${escapeHtml(data.propertyUrl)}" style="color:#c8102e;">${escapeHtml(data.propertyUrl)}</a></div>
+    </div>` : ''}
     ${field('Listing Agent', data.listingAgentName)}
     ${field('Listing Agent MLS ID', data.listingAgentMlsId)}
     <hr class="divider">
@@ -240,8 +279,43 @@ async function sendGeneralContactNotification(data) {
   });
 }
 
+async function sendVerificationEmail({ to, name, verificationToken }) {
+  const verifyUrl = `${CLIENT_URL}/verify-email?token=${verificationToken}`;
+  const html = `
+    <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto; padding: 24px;">
+      <div style="text-align: center; margin-bottom: 24px;">
+        <h1 style="color: #c8102e; margin: 0; font-size: 24px;">Vasu Realty</h1>
+      </div>
+      <h2 style="color: #18181b;">Verify your email address</h2>
+      <p style="color: #52525b; font-size: 15px; line-height: 1.6;">Hello ${escapeHtml(name) || 'there'},</p>
+      <p style="color: #52525b; font-size: 15px; line-height: 1.6;">
+        Thank you for creating an account with Vasu Realty. Please verify your email address by clicking the button below.
+      </p>
+      <div style="text-align: center; margin: 28px 0;">
+        <a href="${verifyUrl}" style="display: inline-block; background: #c8102e; color: #ffffff; padding: 14px 32px; text-decoration: none; border-radius: 8px; font-size: 16px; font-weight: 600;">Verify Email</a>
+      </div>
+      <p style="color: #71717a; font-size: 13px; line-height: 1.5;">
+        This link will expire in 24 hours. If you did not create an account, you can safely ignore this email.
+      </p>
+      <hr style="border: none; border-top: 1px solid #e4e4e7; margin: 24px 0;">
+      <p style="color: #a1a1aa; font-size: 12px; text-align: center;">
+        Vasu Realty &bull; Charlotte, NC &bull; thevasurealty.com<br>
+        Need help? Contact us at thawaitrealty@gmail.com
+      </p>
+    </div>`;
+
+  return sendEmail({
+    to,
+    subject: 'Verify your Vasu Realty email address',
+    html,
+    replyTo: EMAIL_FROM || 'noreply@vasurealty.com',
+  });
+}
+
 module.exports = {
   sendBuyerAgentNotification,
   sendPropertyAgentNotification,
   sendGeneralContactNotification,
+  sendPasswordResetEmail,
+  sendVerificationEmail,
 };

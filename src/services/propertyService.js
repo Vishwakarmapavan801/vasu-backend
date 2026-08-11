@@ -18,6 +18,8 @@ const {
   buildSearchFilters,
   isPreciseFilter,
   getFetchLimit,
+  VALID_PROPERTY_TYPES,
+  parsePropertyTypes,
   BROKERAGE,
 } = require('./searchEngine');
 const { MLS_GRID_BASE_URL, NODE_ENV } = require('../config');
@@ -47,12 +49,11 @@ async function getProperties(params = {}) {
   const top = Math.max(1, parseInt(params.top, 10) || 20);
   const skip = Math.max(0, parseInt(params.skip, 10) || 0);
 
-  // For list queries, limit media to reduce signed URL generation and CDN 429s.
-  // Property card components typically only display 1 image, so 3 is generous.
-  // Fewer media items = fewer signed URLs = fewer CDN requests = lower 429 risk.
-  // Property detail queries (listingId present) get all media.
-  const isDetailQuery = !!(params.listingId || params.listingKey);
-  const maxMedia = isDetailQuery ? 0 : 3; // 0 = all, 3 = max for lists (was 10)
+  // Property cards render all real MLS images (Zillow-style carousels), so
+  // every property payload carries its complete media array. The frontend
+  // lazy-loads images (first visible + neighbor preloads only), so full media
+  // arrays do not cause a burst of CDN requests.
+  const maxMedia = 0; // 0 = all media
 
   // Step 1: Detect search type if 'q' is provided
   let mlsFilters = {};
@@ -69,6 +70,21 @@ async function getProperties(params = {}) {
     // Direct param-based search (from URL params, not free text)
     mlsFilters = buildDirectFilters(params);
     localFilters = buildDirectLocalFilters(params);
+  }
+
+  // Guard against invalid PropertyType enumerations: return an empty result
+  // instead of building an OData filter MLS Grid will reject with a 400.
+  if (mlsFilters._invalidPropertyType) {
+    return {
+      success: true,
+      data: [],
+      totalCount: 0,
+      nextLink: null,
+      page: Math.floor(skip / top),
+      pageSize: top,
+      hasMore: false,
+      warning: `Invalid PropertyType '${mlsFilters._invalidPropertyType}'. Valid values: ${Array.from(VALID_PROPERTY_TYPES).join(', ')}`,
+    };
   }
 
   // Step 2: Apply brokerage scope only when explicitly requested
@@ -101,7 +117,27 @@ async function getProperties(params = {}) {
   // Build query string using ONLY filterable fields
   const queryString = buildQuery(mlsFilters, odataOptions);
   const url = `${MLS_GRID_BASE_URL}/Property?${queryString}`;
-  const data = await fetchWithRetry(url);
+  let data;
+  try {
+    data = await fetchWithRetry(url);
+  } catch (err) {
+    // Defensive: MLS Grid returns 400 for invalid filters/enumerations.
+    // Surface a clean empty result instead of a 500.
+    const mlsStatus = err?.response?.status;
+    const mlsError = err?.response?.data;
+    if (mlsStatus === 400 || /Invalid .* enumeration/i.test(String(mlsError || err.message))) {
+      return {
+        success: true,
+        data: [],
+        totalCount: 0,
+        nextLink: null,
+        page: Math.floor(skip / top),
+        pageSize: top,
+        hasMore: false,
+      };
+    }
+    throw err;
+  }
 
   // Normalize with media limiting to reduce signed URL generation
   let properties = (data.value || []).map(p => normalizeProperty(p, { maxMedia }));
@@ -166,7 +202,15 @@ function buildDirectFilters(params) {
     filters.standardStatus = statusMap[normalized] || params.status;
   }
   if (params.propertyType) {
-    filters.propertyType = params.propertyType;
+    const { types, valid } = parsePropertyTypes(params.propertyType);
+    if (valid) {
+      // Array form triggers the OR'd OData filter in buildFilter()
+      filters.propertyType = types.length === 1 ? types[0] : types;
+    } else {
+      // Flag invalid enumerations so the pipeline returns empty
+      // instead of sending a bad OData filter to MLS Grid (400).
+      filters._invalidPropertyType = String(params.propertyType);
+    }
   }
   if (params.officeId) {
     filters.listOfficeMlsId = params.officeId;
@@ -282,12 +326,31 @@ async function getPropertyByKey(listingKey) {
  * Get featured properties (most recently modified, Active).
  */
 async function getFeaturedProperties(params = {}) {
-  return getProperties({
-    status: 'Active',
-    orderby: 'ModificationTimestamp desc',
-    top: params.top || 6,
-    applyBrokerageScope: false, // Featured is broader
-  });
+  const top = Math.max(1, parseInt(params.top, 10) || 6);
+
+  // Fetch extra candidates and keep only listings that actually have photos,
+  // so the hero never renders an empty placeholder card.
+  let properties = [];
+  let totalCount = 0;
+  let result = null;
+  for (let attempts = 0; attempts < 3 && properties.length < top; attempts++) {
+    result = await getProperties({
+      status: 'Active',
+      orderby: 'ModificationTimestamp desc',
+      top: Math.max(top * 3, 12),
+      skip: attempts * Math.max(top * 3, 12),
+      applyBrokerageScope: false, // Featured is broader
+    });
+    const page = (result?.data || []).filter(p => p && Number(p.PhotosCount || 0) > 0);
+    properties = properties.concat(page);
+    totalCount = result?.totalCount || totalCount;
+    if (page.length === 0) break;
+  }
+
+  return {
+    data: properties.slice(0, top),
+    totalCount,
+  };
 }
 
 /**
@@ -376,6 +439,20 @@ async function getMembers(params = {}) {
 }
 
 /**
+ * Get a single member (agent) by their MLS ID (e.g., "CAR55981").
+ */
+async function getMemberByMlsId(memberMlsId) {
+  if (!memberMlsId) return { success: true, data: null, totalCount: 0 };
+  const url = `${MLS_GRID_BASE_URL}/Member?$filter=${encodeURIComponent(`MemberMlsId eq '${memberMlsId}'`)}&$top=1&$count=true`;
+  const data = await fetchWithRetry(url);
+  return {
+    success: true,
+    data: (data.value || [])[0] || null,
+    totalCount: data['@odata.count'] || 0,
+  };
+}
+
+/**
  * Get offices from MLS Grid.
  */
 async function getOffices(params = {}) {
@@ -441,7 +518,7 @@ async function getOpenHouseProperties(params = {}) {
     try {
       const propUrl = `${MLS_GRID_BASE_URL}/Property('${encodeURIComponent(listingKey)}')?$expand=Media`;
       const propData = await fetchWithRetry(propUrl);
-      const normalized = normalizeProperty(propData, { maxMedia: 3 });
+      const normalized = normalizeProperty(propData, { maxMedia: 0 });
       if (normalized) {
         properties.push(normalized);
       }
@@ -517,7 +594,12 @@ async function getPropertiesByCity(cityName, params = {}) {
   mlsFilters.standardStatus = statusMap[normalized] || (['Active','Pending','Closed','ComingSoon'].includes(status) ? status : 'Active');
 
   if (params.propertyType) {
-    mlsFilters.propertyType = params.propertyType;
+    const { types, valid } = parsePropertyTypes(params.propertyType);
+    if (!valid) {
+      return { success: true, data: [], totalCount: 0, page: 0, pageSize: top, hasMore: false };
+    }
+    mlsFilters.propertyType = types.length === 1 ? types[0] : types;
+    params._propertyTypes = types;
   }
 
   const odataOptions = {
@@ -536,8 +618,8 @@ async function getPropertiesByCity(cityName, params = {}) {
   const rawCities = new Set((data.value || []).map(p => String(p.City || '').trim()).filter(Boolean));
   const rawOsn = new Set((data.value || []).map(p => String(p.OriginatingSystemName || '').trim()).filter(Boolean));
 
-  // Normalize with limited media for list views
-  let properties = (data.value || []).map(p => normalizeProperty(p, { maxMedia: 3 }));
+  // Normalize with all media for list views (cards render full carousels)
+  let properties = (data.value || []).map(p => normalizeProperty(p, { maxMedia: 0 }));
   const normalizedCount = properties.length;
 
   // Apply local city filter (case-insensitive, exact match)
@@ -577,7 +659,10 @@ async function getPropertiesByCity(cityName, params = {}) {
   if (ba) properties = properties.filter(p => Number(p.BathroomsFull || 0) >= Number(ba));
   if (params.minSqft) properties = properties.filter(p => Number(p.LivingArea || 0) >= Number(params.minSqft));
   if (params.maxSqft) properties = properties.filter(p => Number(p.LivingArea || 0) <= Number(params.maxSqft));
-  if (params.propertyType) properties = properties.filter(p => (p.PropertyType || '').toLowerCase() === String(params.propertyType).toLowerCase());
+  if (params.propertyType) {
+    const pTypes = params._propertyTypes || [];
+    properties = properties.filter(p => pTypes.includes((p.PropertyType || '').trim()));
+  }
 
   const totalCount = properties.length;
 
@@ -741,43 +826,52 @@ async function getComparableProperties(listingKey) {
     const url = `${MLS_GRID_BASE_URL}/Property?${odataQuery}`;
     const data = await fetchWithRetry(url);
 
-    const properties = (data.value || [])
+    const rawScored = (data.value || [])
       .filter(p => p.ListingKey !== listingKey)
-      .map(p => normalizeProperty(p, { maxMedia: 1 }))
+      .map(p => {
+        let score = 0;
+        const sameZip = p.PostalCode && zip && String(p.PostalCode).substring(0, 5) === String(zip).substring(0, 5);
+        const sameCity = p.City && city && String(p.City).toLowerCase() === String(city).toLowerCase();
+        const priceDiff = price > 0 ? Math.abs(Number(p.ListPrice || 0) - price) / price : 1;
+        const bedsDiff = Math.abs(Number(p.BedroomsTotal || 0) - beds);
+        const bathsDiff = Math.abs(Number(p.BathroomsFull || 0) - baths);
+
+        if (sameZip) score += 30;
+        if (sameCity) score += 20;
+        if (type && p.PropertyType === type) score += 15;
+        if (priceDiff < 0.1) score += 15;
+        else if (priceDiff < 0.25) score += 10;
+        else if (priceDiff < 0.5) score += 5;
+        if (bedsDiff === 0) score += 10;
+        else if (bedsDiff <= 1) score += 5;
+        if (bathsDiff === 0) score += 10;
+        else if (bathsDiff <= 1) score += 5;
+
+        // Same status
+        if (p.StandardStatus === source.StandardStatus) score += 5;
+
+        return { ...p, similarityScore: score };
+      });
+
+    const totalCandidateCount = rawScored.length;
+
+    // Normalize only the top comparables with their complete media arrays so
+    // comparable cards can render full image carousels without materializing
+    // signed URLs for every candidate property.
+    const sorted = rawScored
+      .sort((a, b) => b.similarityScore - a.similarityScore)
+      .slice(0, 6)
+      .map(p => {
+        const { similarityScore, ...rest } = p;
+        const normalized = normalizeProperty(rest, { maxMedia: 0 });
+        return normalized ? { ...normalized, similarityScore } : null;
+      })
       .filter(Boolean);
-
-    // Score and sort by similarity
-    const scored = properties.map(p => {
-      let score = 0;
-      const sameZip = p.PostalCode && zip && String(p.PostalCode).substring(0, 5) === String(zip).substring(0, 5);
-      const sameCity = p.City && city && String(p.City).toLowerCase() === String(city).toLowerCase();
-      const priceDiff = price > 0 ? Math.abs(Number(p.ListPrice || 0) - price) / price : 1;
-      const bedsDiff = Math.abs(Number(p.BedroomsTotal || 0) - beds);
-      const bathsDiff = Math.abs(Number(p.BathroomsFull || 0) - baths);
-
-      if (sameZip) score += 30;
-      if (sameCity) score += 20;
-      if (type && p.PropertyType === type) score += 15;
-      if (priceDiff < 0.1) score += 15;
-      else if (priceDiff < 0.25) score += 10;
-      else if (priceDiff < 0.5) score += 5;
-      if (bedsDiff === 0) score += 10;
-      else if (bedsDiff <= 1) score += 5;
-      if (bathsDiff === 0) score += 10;
-      else if (bathsDiff <= 1) score += 5;
-
-      // Same status
-      if (p.StandardStatus === source.StandardStatus) score += 5;
-
-      return { ...p, similarityScore: score };
-    });
-
-    const sorted = scored.sort((a, b) => b.similarityScore - a.similarityScore).slice(0, 6);
 
     return {
       success: true,
       data: sorted,
-      totalCount: properties.length,
+      totalCount: totalCandidateCount,
       source: {
         city, zip, price, propertyType: type, bedrooms: beds, bathrooms: baths,
       },
@@ -802,6 +896,7 @@ module.exports = {
   getSoldProperties,
   searchProperties,
   getMembers,
+  getMemberByMlsId,
   getOffices,
   getOpenHouses,
   getOpenHouseProperties,

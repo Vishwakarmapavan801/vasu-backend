@@ -7,6 +7,7 @@
 
 const { Router } = require('express');
 const rateLimit = require('express-rate-limit');
+const asyncHandler = require('../middleware/asyncHandler');
 const controller = require('../controllers/authController');
 const { requireAuth } = require('../middleware/auth');
 
@@ -16,17 +17,32 @@ const router = Router();
 const authLimiter = rateLimit({
   windowMs: 15 * 60 * 1000,
   max: 20,
+  skip: () => process.env.NODE_ENV !== 'production',
   standardHeaders: true,
   legacyHeaders: false,
   message: { success: false, error: 'Too many attempts. Please try again later.' },
 });
 
 // Public endpoints (rate-limited)
-router.post('/register', authLimiter, controller.register);
-router.post('/login', authLimiter, controller.login);
-router.post('/logout', controller.logout);
+router.post('/register', authLimiter, asyncHandler(controller.register));
+router.post('/login', authLimiter, asyncHandler(controller.login));
+router.post('/google', authLimiter, asyncHandler(controller.googleLogin));
+router.post('/forgot-password', authLimiter, asyncHandler(controller.forgotPassword));
+router.post('/reset-password/:token', asyncHandler(controller.resetPassword));
+router.put('/reset-password/:token', asyncHandler(controller.resetPassword));
+router.post('/logout', asyncHandler(controller.logout));
+router.post('/refresh', asyncHandler(controller.refreshToken));
 
-// Protected endpoint (requires valid JWT)
-router.get('/me', requireAuth, controller.getMe);
+// Email verification
+router.get('/verify-email', asyncHandler(controller.verifyEmail));
+router.post('/resend-verification', asyncHandler(controller.resendVerification));
+
+// Dev-only: auto-login (no rate limit, no auth required)
+router.post('/dev-login', asyncHandler(controller.devLogin));
+
+// Protected endpoints (requires valid JWT)
+router.get('/me', requireAuth, asyncHandler(controller.getMe));
+router.put('/profile', requireAuth, asyncHandler(controller.updateProfile));
+router.put('/change-password', requireAuth, asyncHandler(controller.changePassword));
 
 module.exports = router;

@@ -380,17 +380,27 @@ CREATE INDEX idx_quick_questions_status ON quick_questions(status);
 -- 12. users - Registered user accounts for authentication
 -- ================================================================
 CREATE TABLE IF NOT EXISTS users (
-    id              UUID PRIMARY KEY DEFAULT gen_random_uuid(),
-    email           VARCHAR(255) NOT NULL UNIQUE,
-    password_hash   VARCHAR(255) NOT NULL,
-    name            VARCHAR(255) NOT NULL,
-    phone           VARCHAR(50),
-    email_verified  BOOLEAN NOT NULL DEFAULT FALSE,
-    created_at      TIMESTAMPTZ NOT NULL DEFAULT NOW(),
-    updated_at      TIMESTAMPTZ NOT NULL DEFAULT NOW()
+    id                      UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+    email                   VARCHAR(255) NOT NULL UNIQUE,
+    password_hash           VARCHAR(255),
+    name                    VARCHAR(255) NOT NULL,
+    phone                   VARCHAR(50),
+    email_verified          BOOLEAN NOT NULL DEFAULT FALSE,
+    google_id               VARCHAR(255),
+    reset_token             VARCHAR(255),
+    reset_token_expires_at  TIMESTAMPTZ,
+    created_at              TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+    updated_at              TIMESTAMPTZ NOT NULL DEFAULT NOW()
 );
 
+ALTER TABLE users ADD COLUMN IF NOT EXISTS reset_token VARCHAR(255);
+ALTER TABLE users ADD COLUMN IF NOT EXISTS reset_token_expires_at TIMESTAMPTZ;
+ALTER TABLE users ADD COLUMN IF NOT EXISTS google_id VARCHAR(255);
+ALTER TABLE users ADD COLUMN IF NOT EXISTS email_verified_at TIMESTAMPTZ;
+ALTER TABLE users ALTER COLUMN password_hash DROP NOT NULL;
+
 CREATE UNIQUE INDEX IF NOT EXISTS idx_users_email ON users(email);
+CREATE UNIQUE INDEX IF NOT EXISTS idx_users_google_id ON users(google_id) WHERE google_id IS NOT NULL;
 CREATE INDEX IF NOT EXISTS idx_users_created_at ON users(created_at DESC);
 
 -- ================================================================

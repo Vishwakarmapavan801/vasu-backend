@@ -5,7 +5,20 @@
   "main": "src/server.js",
   "scripts": {
     "start": "node src/server.js",
-    "dev": "node --watch src/server.js"
+    "dev": "node --watch src/server.js",
+    "migrate-v9": "node src/db/run-migration-v9.js",
+    "migrate-v10": "node src/db/run-migration-v10.js",
+    "migrate-v11": "node src/db/run-migration-v11.js",
+    "migrate-v13": "node src/db/run-migration-v13.js",
+    "migrate-v14": "node src/db/run-migration-v14.js",
+    "migrate-v15": "node src/db/run-migration-v15.js",
+    "migrate": "node src/db/run-migration-v9.js && node src/db/run-migration-v10.js && node src/db/run-migration-v11.js && node src/db/run-migration-v13.js && node src/db/run-migration-v14.js && node src/db/run-migration-v15.js",
+    "blog:generate": "node src/modules/blog/services/blogGeneratorService.js --run",
+    "create-admin": "node src/scripts/createAdmin.js",
+    "test": "jest --forceExit --detectOpenHandles",
+    "test:watch": "jest --watch",
+    "lint": "eslint src/",
+    "backup": "node -e \"require('./src/services/backup/backupService').createBackup('full').then(r => console.log('Backup:', r.filename)).catch(console.error)\""
   },
   "keywords": [
     "mls",
@@ -16,18 +29,45 @@
   "license": "ISC",
   "type": "commonjs",
   "dependencies": {
+    "@aws-sdk/client-s3": "^3.600.0",
+    "@sendgrid/mail": "^8.1.0",
+    "@sentry/node": "^8.55.2",
+    "@sentry/profiling-node": "^8.55.2",
     "axios": "^1.18.1",
-    "bcrypt": "^6.0.0",
+    "bcryptjs": "^2.4.3",
+    "bullmq": "^5.8.0",
     "compression": "^1.8.1",
     "cors": "^2.8.6",
     "dotenv": "^17.4.2",
     "express": "^5.2.1",
     "express-rate-limit": "^8.6.0",
+    "google-auth-library": "^9.15.1",
+    "googleapis": "^140.0.0",
     "helmet": "^8.3.0",
+    "ioredis": "^5.4.0",
     "jsonwebtoken": "^9.0.3",
     "morgan": "^1.11.0",
+    "multer": "^2.2.0",
     "nodemailer": "^9.0.3",
     "openai": "^6.49.0",
-    "pg": "^8.22.0"
+    "pg": "^8.22.0",
+    "sharp": "^0.35.3",
+    "stripe": "^16.0.0",
+    "twilio": "^5.2.0",
+    "winston": "^3.13.0"
+  },
+  "devDependencies": {
+    "jest": "^29.7.0",
+    "supertest": "^7.0.0"
+  },
+  "jest": {
+    "testEnvironment": "node",
+    "testMatch": [
+      "**/tests/**/*.test.js"
+    ],
+    "modulePathIgnorePatterns": [
+      "<rootDir>/node_modules",
+      "<rootDir>/dist"
+    ]
   }
 }
