@@ -1,23 +1,34 @@
 /**
  * Email Notification Service
  *
- * Production-ready email service using Nodemailer.
- * Sends HTML emails for all form submissions.
+ * Sends HTML emails for form submissions and auth emails (verification,
+ * password reset). Primary transport is Resend when RESEND_API_KEY is set;
+ * falls back to Nodemailer/SMTP when configured, otherwise a debug transport
+ * that only logs (no real delivery).
  *
  * Configuration via environment variables:
- *   SMTP_HOST       — SMTP server hostname
- *   SMTP_PORT       — SMTP server port (default: 587)
- *   SMTP_USER       — SMTP username
- *   SMTP_PASSWORD   — SMTP password
- *   EMAIL_FROM      — "From" address for outgoing emails
- *   EMAIL_TO        — Default recipient address for notifications
+ *   RESEND_API_KEY   — Resend API key (primary transport)
+ *   RESEND_FROM_EMAIL — "From" address on a Resend-verified domain
+ *   SMTP_HOST        — SMTP server hostname (fallback transport)
+ *   SMTP_PORT        — SMTP server port (default: 587)
+ *   SMTP_USER        — SMTP username
+ *   SMTP_PASSWORD    — SMTP password
+ *   EMAIL_FROM       — "From" address for outgoing emails
+ *   EMAIL_TO         — Default recipient address for notifications
  *
  * Error handling: If email delivery fails, the error is logged but
  * NEVER thrown — the caller should never fail due to email issues.
  */
 
 const nodemailer = require('nodemailer');
+const axios = require('axios');
 const { EMAIL_FROM, EMAIL_TO, CLIENT_URL } = require('../config');
+
+// ================================================================
+// Resend (primary transport when RESEND_API_KEY is configured)
+// ================================================================
+const RESEND_API_URL = 'https://api.resend.com/emails';
+const RESEND_FROM_NAME = process.env.RESEND_FROM_NAME || 'Vasu Realty';
 
 // ================================================================
 // Transporter
@@ -79,6 +90,11 @@ function escapeHtml(str) {
 
 async function sendEmail({ to, subject, html, replyTo }) {
   try {
+    // Primary transport: Resend (when the API key is configured in the environment)
+    if (process.env.RESEND_API_KEY) {
+      return await sendViaResend({ to, subject, html, replyTo });
+    }
+
     const transport = getTransporter();
     const from = EMAIL_FROM || 'noreply@vasurealty.com';
     const result = await transport.sendMail({ from, to, subject, html, replyTo });
@@ -88,6 +104,44 @@ async function sendEmail({ to, subject, html, replyTo }) {
     console.error(`[emailService] ✗ Failed to send email to ${to}:`, err.message);
     // Never throw — email failures must not affect the user's submission
     return null;
+  }
+}
+
+/**
+ * Send an email through the Resend API (POST https://api.resend.com/emails).
+ * The API key is read from process.env.RESEND_API_KEY and is NEVER logged or
+ * returned to callers. Failures (invalid key, unverified sender domain, invalid
+ * recipient, network/API errors) are logged with status/body detail and
+ * rethrown so the caller's existing never-throw handling applies.
+ */
+async function sendViaResend({ to, subject, html, replyTo }) {
+  const from = process.env.RESEND_FROM_EMAIL || EMAIL_FROM || 'noreply@vasurealty.com';
+  const payload = {
+    from: `${RESEND_FROM_NAME} <${from}>`,
+    to: Array.isArray(to) ? to : [to],
+    subject,
+    html,
+  };
+  if (replyTo) payload.reply_to = replyTo;
+
+  try {
+    const res = await axios.post(RESEND_API_URL, payload, {
+      headers: {
+        Authorization: `Bearer ${process.env.RESEND_API_KEY}`,
+        'Content-Type': 'application/json',
+      },
+      timeout: 15000,
+    });
+    const emailId = res.data && res.data.id ? res.data.id : 'accepted';
+    console.log(`[emailService] ✓ Email sent to ${to} via Resend (${emailId}) — subject: "${subject}"`);
+    return res.data;
+  } catch (err) {
+    const status = err.response ? err.response.status : null;
+    const detail = err.response && err.response.data
+      ? JSON.stringify(err.response.data)
+      : (err.code || err.message || 'Unknown Resend error');
+    console.error(`[emailService] ✗ Resend request failed (HTTP ${status || 'network'}): ${detail}`);
+    throw err;
   }
 }
 
@@ -107,7 +161,7 @@ async function sendPasswordResetEmail({ to, name, resetToken }) {
     to,
     subject: 'Reset your Vasu Realty password',
     html,
-    replyTo: EMAIL_FROM || 'noreply@vasurealty.com',
+    replyTo: process.env.RESEND_FROM_EMAIL || EMAIL_FROM || 'noreply@vasurealty.com',
   });
 }
 
@@ -308,7 +362,7 @@ async function sendVerificationEmail({ to, name, verificationToken }) {
     to,
     subject: 'Verify your Vasu Realty email address',
     html,
-    replyTo: EMAIL_FROM || 'noreply@vasurealty.com',
+    replyTo: process.env.RESEND_FROM_EMAIL || EMAIL_FROM || 'noreply@vasurealty.com',
   });
 }
 

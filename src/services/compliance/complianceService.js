@@ -12,7 +12,15 @@ const COMPLIANCE_RULES = {
 
 const BROKERAGE_DISCLAIMER = 'Listing information provided by Canopy MLS. IDX information is provided exclusively for personal, non-commercial use and may not be used for any purpose other than to identify prospective properties for purchase.';
 
-async function validateListing(listing) {
+function isFalse(value) {
+  if (value === false || value === 0) return true;
+  if (typeof value === 'string') {
+    return ['false', 'f', 'n', 'no', '0'].includes(value.trim().toLowerCase());
+  }
+  return false;
+}
+
+function validateListing(listing) {
   const issues = [];
 
   if (COMPLIANCE_RULES.REQUIRE_MLS_ID && !listing.ListingKey) {
@@ -21,6 +29,18 @@ async function validateListing(listing) {
 
   if (listing.ListingKey && !/^[A-Za-z0-9-]+$/.test(listing.ListingKey)) {
     issues.push({ field: 'ListingKey', severity: 'error', message: 'Invalid MLS ID format' });
+  }
+
+  if (isFalse(listing.MlgCanView)) {
+    issues.push({ field: 'MlgCanView', severity: 'error', message: 'MLS restricts consumer viewing of this listing' });
+  }
+
+  if (isFalse(listing.InternetEntireListingDisplayYN)) {
+    issues.push({ field: 'InternetEntireListingDisplayYN', severity: 'error', message: 'MLS restricts display of the entire listing on the Internet' });
+  }
+
+  if (isFalse(listing.InternetAddressDisplayYN)) {
+    issues.push({ field: 'InternetAddressDisplayYN', severity: 'error', message: 'MLS restricts display of the listing address on the Internet' });
   }
 
   if (COMPLIANCE_RULES.REQUIRE_AGENT_NAME && !listing.ListAgentFullName) {
@@ -46,7 +66,7 @@ async function validateListing(listing) {
       const lower = field.toLowerCase();
       for (const word of COMPLIANCE_RULES.BANNED_WORDS) {
         if (lower.includes(word)) {
-          issues.push({ field: 'remarks', severity: 'error', message: `Contains prohibited term: "${word}"` });
+          issues.push({ field: 'remarks', severity: 'info', message: `Contains prohibited term: "${word}"` });
         }
       }
     }
@@ -58,6 +78,7 @@ async function validateListing(listing) {
 
 async function logComplianceCheck(listingKey, userId, issues, action = 'display') {
   try {
+    const safeIssues = Array.isArray(issues) ? issues : [];
     await pool.query(
       `INSERT INTO mls_compliance_log (listing_key, user_id, action, issues, status, checked_at)
        VALUES ($1, $2, $3, $4, $5, NOW())`,
@@ -65,8 +86,8 @@ async function logComplianceCheck(listingKey, userId, issues, action = 'display'
         listingKey,
         userId || null,
         action,
-        JSON.stringify(issues),
-        issues.some(i => i.severity === 'error') ? 'blocked' : 'allowed',
+        JSON.stringify(safeIssues),
+        safeIssues.some(i => i.severity === 'error') ? 'blocked' : 'allowed',
       ]
     );
   } catch (err) {

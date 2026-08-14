@@ -7,7 +7,7 @@
 CREATE TABLE IF NOT EXISTS billing_invoices (
   id SERIAL PRIMARY KEY,
   stripe_invoice_id VARCHAR(255) UNIQUE,
-  user_id INTEGER REFERENCES users(id) ON DELETE SET NULL,
+  user_id UUID REFERENCES users(id) ON DELETE SET NULL,
   amount NUMERIC(12,2) NOT NULL,
   currency VARCHAR(3) DEFAULT 'usd',
   status VARCHAR(50) NOT NULL DEFAULT 'pending',
@@ -22,7 +22,7 @@ CREATE INDEX IF NOT EXISTS idx_billing_invoices_status ON billing_invoices(statu
 
 CREATE TABLE IF NOT EXISTS billing_events (
   id SERIAL PRIMARY KEY,
-  user_id INTEGER REFERENCES users(id) ON DELETE SET NULL,
+  user_id UUID REFERENCES users(id) ON DELETE SET NULL,
   event_type VARCHAR(100) NOT NULL,
   data JSONB,
   created_at TIMESTAMP DEFAULT NOW()
@@ -63,7 +63,7 @@ CREATE INDEX IF NOT EXISTS idx_mls_sync_errors_listing ON mls_sync_errors(listin
 CREATE TABLE IF NOT EXISTS mls_compliance_log (
   id SERIAL PRIMARY KEY,
   listing_key VARCHAR(255),
-  user_id INTEGER REFERENCES users(id) ON DELETE SET NULL,
+  user_id UUID REFERENCES users(id) ON DELETE SET NULL,
   action VARCHAR(50) NOT NULL DEFAULT 'display',
   issues JSONB,
   status VARCHAR(50) NOT NULL DEFAULT 'allowed',
@@ -97,7 +97,7 @@ CREATE INDEX IF NOT EXISTS idx_email_logs_sent_at ON email_logs(sent_at);
 -- ============================================================
 CREATE TABLE IF NOT EXISTS calendar_tokens (
   id SERIAL PRIMARY KEY,
-  user_id INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+  user_id UUID NOT NULL REFERENCES users(id) ON DELETE CASCADE,
   provider VARCHAR(50) NOT NULL DEFAULT 'google',
   access_token TEXT,
   refresh_token TEXT,
@@ -156,7 +156,7 @@ CREATE TABLE IF NOT EXISTS schema_audit (
 -- ============================================================
 CREATE TABLE IF NOT EXISTS api_keys (
   id SERIAL PRIMARY KEY,
-  user_id INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+  user_id UUID NOT NULL REFERENCES users(id) ON DELETE CASCADE,
   name VARCHAR(255) NOT NULL,
   key_hash VARCHAR(255) NOT NULL,
   key_prefix VARCHAR(10) NOT NULL,
@@ -175,7 +175,7 @@ CREATE UNIQUE INDEX IF NOT EXISTS idx_api_keys_hash ON api_keys(key_hash);
 -- ============================================================
 CREATE TABLE IF NOT EXISTS user_devices (
   id SERIAL PRIMARY KEY,
-  user_id INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+  user_id UUID NOT NULL REFERENCES users(id) ON DELETE CASCADE,
   device_token TEXT NOT NULL,
   platform VARCHAR(20) NOT NULL,
   is_active BOOLEAN DEFAULT true,

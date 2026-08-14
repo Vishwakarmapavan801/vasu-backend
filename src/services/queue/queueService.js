@@ -6,7 +6,12 @@ let connection = null;
 const queues = {};
 
 function initQueue() {
-  const redisUrl = process.env.REDIS_URL || 'redis://localhost:6379';
+  if (!process.env.REDIS_URL) {
+    logger.info('REDIS_URL not set — Redis/BullMQ disabled (queues run degraded)');
+    return false;
+  }
+
+  const redisUrl = process.env.REDIS_URL;
 
   try {
     connection = new IORedis(redisUrl, {
@@ -104,10 +109,11 @@ async function retryFailedJob(queueName, jobId) {
 }
 
 async function closeAll() {
+  if (!connection) return;
   for (const queue of Object.values(queues)) {
     await queue.close();
   }
-  if (connection) await connection.quit();
+  await connection.quit();
 }
 
 module.exports = {

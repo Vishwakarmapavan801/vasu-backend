@@ -42,16 +42,17 @@ function getClient() {
  * @param {Object} [options.jsonSchema] - Optional JSON schema for structured output
  * @param {number} [options.maxTokens] - Override max tokens
  * @param {number} [options.temperature=0.3] - Temperature (low for deterministic extraction)
+ * @param {string} [options.model] - Override model (defaults to OPENAI_MODEL)
  * @returns {Promise<Object>} { success, data, error, model, usage }
  */
-async function chatCompletion({ systemPrompt, userMessage, jsonSchema, maxTokens, temperature = 0.3 }) {
+async function chatCompletion({ systemPrompt, userMessage, jsonSchema, maxTokens, temperature = 0.3, model }) {
   const messages = [
     { role: 'system', content: systemPrompt },
     { role: 'user', content: userMessage },
   ];
 
   const completionOptions = {
-    model: OPENAI_MODEL,
+    model: model || OPENAI_MODEL,
     messages,
     max_tokens: maxTokens || OPENAI_MAX_TOKENS,
     temperature,

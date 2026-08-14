@@ -14,6 +14,7 @@ const transactionsAdminController = require('../controllers/transactionsAdminCon
 const mediaAdminController = require('../controllers/mediaAdminController');
 const settingsAdminController = require('../controllers/settingsAdminController');
 const auditAdminController = require('../controllers/auditAdminController');
+const blogAdminRoutes = require('../../blog/routes/blogAdminRoutes');
 
 const router = express.Router();
 
@@ -98,5 +99,9 @@ router.delete('/settings/:key', requireAuth, requireRole('settings'), settingsAd
 // Audit logs
 router.get('/logs', requireAuth, requireRole('logs'), auditAdminController.getLogs);
 router.get('/audit', requireAuth, requireRole('logs'), auditAdminController.getLogs);
+
+// AI Blog Manager (generate/approve/publish/CRUD + generation jobs).
+// The blogAdminRoutes router applies its own requireAuth + requireRole('posts').
+router.use('/blog', blogAdminRoutes);
 
 module.exports = router;

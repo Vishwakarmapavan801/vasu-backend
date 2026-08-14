@@ -96,7 +96,7 @@ async function createOpenHouse(req, res, next) {
 
 // AI Investment Scores
 async function getInvestmentScore(req, res, next) {
-  try { const data = await insightsService.getInvestmentScore(req.params.listingKey); if (!data) return res.status(404).json({ success: false, error: 'Not computed yet' }); return res.status(200).json({ success: true, data }); }
+  try { const data = await insightsService.getInvestmentScore(req.params.listingKey); return res.status(200).json({ success: true, data: data || null }); }
   catch (err) { next(err); }
 }
 async function upsertInvestmentScore(req, res, next) {
@@ -106,7 +106,7 @@ async function upsertInvestmentScore(req, res, next) {
 
 // AI Rental Estimates
 async function getRentalEstimate(req, res, next) {
-  try { const data = await insightsService.getRentalEstimate(req.params.listingKey); if (!data) return res.status(404).json({ success: false, error: 'Not computed yet' }); return res.status(200).json({ success: true, data }); }
+  try { const data = await insightsService.getRentalEstimate(req.params.listingKey); return res.status(200).json({ success: true, data: data || null }); }
   catch (err) { next(err); }
 }
 async function upsertRentalEstimate(req, res, next) {

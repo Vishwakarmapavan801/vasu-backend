@@ -17,6 +17,8 @@ router.get('/schools/:id', publicLimiter, asyncHandler(ctrl.getSchool));
 router.get('/neighborhoods/:id/schools', publicLimiter, asyncHandler(ctrl.getNeighborhoodSchools));
 router.get('/commute', publicLimiter, asyncHandler(ctrl.getCommute));
 router.get('/nearby', publicLimiter, asyncHandler(ctrl.getNearby));
+// Overpass proxy — parallel mirrors + server-side cache for the Nearby Places UI
+router.post('/nearby/overpass', publicLimiter, asyncHandler(ctrl.proxyOverpass));
 router.get('/trending/topics', publicLimiter, asyncHandler(ctrl.getTrending));
 router.get('/market-summary/:location', publicLimiter, asyncHandler(ctrl.getMarketSummary));
 

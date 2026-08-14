@@ -16,6 +16,7 @@ module.exports = function securityMiddleware(app) {
       },
     },
     crossOriginEmbedderPolicy: false,
+    crossOriginOpenerPolicy: false,
     crossOriginResourcePolicy: { policy: 'cross-origin' },
   }));
 

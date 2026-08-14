@@ -94,7 +94,7 @@ const corsOptions = {
 // Core Middlewares
 // ============================================================
 app.use(compression);
-app.use(helmet());
+app.use(helmet({ crossOriginOpenerPolicy: false }));
 app.use(cors(corsOptions));
 app.use((_req, res, next) => {
   res.setHeader('Cross-Origin-Resource-Policy', 'cross-origin');
@@ -250,6 +250,10 @@ app.use('/api', publicLimiter, mlsRoutes);
 // Public MLS blog (production editorial content from real MLS listings)
 app.use('/api/blog', blogRoutes);
 
+// Public AI + MLS blog API (posts, sitemap, RSS)
+const publicBlogRoutes = require('./modules/blog/routes/publicBlogRoutes');
+app.use('/api/public/blog', publicBlogRoutes);
+
 // Form submission routes (POST) — database-backed
 app.use('/api', formRoutes);
 
@@ -305,11 +309,13 @@ app.use('/api', socialRoutes);
 // Market Module routes (v9 - neighborhoods, schools, commute, ZIP stats)
 app.use('/api', marketRoutes);
 
+// Insights Module routes (v9 - comparisons, mortgage, AI, analytics, listing metadata)
+// Mounted before the auth-gated /api routers (CRM) so their router-level
+// requireAuth doesn't shadow the public AI/analytics endpoints.
+app.use('/api', insightsRoutes);
+
 // CRM Module routes (v9 - agent lead management)
 app.use('/api', crmRoutes);
-
-// Insights Module routes (v9 - comparisons, mortgage, AI, analytics, listing metadata)
-app.use('/api', insightsRoutes);
 
 // Operations Module routes (v10 - lead capture, tours, offers, transactions, attribution)
 app.use('/api', operationsRoutes);
@@ -397,6 +403,10 @@ app.listen(serverPort, () => {
   const { startMediaWarmup } = require('./jobs/mediaWarmup');
   startMediaWarmup();
   console.log('  Media warmup started (featured + search result images)\n');
+
+  // Start daily AI blog generation cron (default 8:00 AM local).
+  const { startBlogCron } = require('./jobs/blogCron');
+  startBlogCron();
 
   // Start production background workers if Redis is available
   if (process.env.REDIS_URL) {

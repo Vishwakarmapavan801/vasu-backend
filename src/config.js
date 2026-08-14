@@ -56,6 +56,63 @@ const config = {
   BROKERAGE_ADDRESS: process.env.BROKERAGE_ADDRESS,
   BROKERAGE_SECONDARY_ADDRESS: process.env.BROKERAGE_SECONDARY_ADDRESS,
   BROKERAGE_NAME: process.env.BROKERAGE_NAME || 'Vasu Realty',
+
+  // ============================================================
+  // AutoSocial MCP (live snapshot + market data source)
+  // ============================================================
+  // HMAC auth scheme:
+  //   signature = HMAC_SHA256(key = SHA256(HMAC_SECRET),
+  //                          data = "{timestamp}.{rawRequestBody}")
+  // Headers: X-AutoSocial-Key, X-MCP-Signature, X-Timestamp
+  AUTOSOCIAL_MCP_BASE_URL: process.env.AUTOSOCIAL_MCP_BASE_URL,
+  AUTOSOCIAL_API_KEY: process.env.AUTOSOCIAL_API_KEY,
+  AUTOSOCIAL_HMAC_SECRET: process.env.AUTOSOCIAL_HMAC_SECRET,
+  // Organization identifier for the authenticated AutoSocial account.
+  // Sent as X-Org-Id on every MCP request when set (the MCP server requires
+  // organization context for property/portfolio tool calls).
+  AUTOSOCIAL_ORG_ID: process.env.AUTOSOCIAL_ORG_ID,
+  AUTOSOCIAL_MCP_TIMEOUT_MS: parseInt(process.env.AUTOSOCIAL_MCP_TIMEOUT_MS, 10) || 30000,
+  AUTOSOCIAL_MCP_MAX_RETRIES: parseInt(process.env.AUTOSOCIAL_MCP_MAX_RETRIES, 10) || 3,
+  AUTOSOCIAL_SIGNATURE_ENCODING: process.env.AUTOSOCIAL_SIGNATURE_ENCODING || 'hex', // hex | base64
+  AUTOSOCIAL_TIMESTAMP_UNIT: process.env.AUTOSOCIAL_TIMESTAMP_UNIT || 's', // s | ms
+  AUTOSOCIAL_MCP_PROTOCOL_VERSION: process.env.AUTOSOCIAL_MCP_PROTOCOL_VERSION || '2024-11-05',
+
+  // ============================================================
+  // Blog AI generation (OpenAI)
+  // ============================================================
+  BLOG_OPENAI_MODEL: process.env.BLOG_OPENAI_MODEL || 'gpt-4o',
+  BLOG_OPENAI_MAX_TOKENS: parseInt(process.env.BLOG_OPENAI_MAX_TOKENS, 10) || 6000,
+  BLOG_IMAGE_MODEL: process.env.BLOG_IMAGE_MODEL || 'dall-e-3', // dall-e-3 | gpt-image-1
+  BLOG_IMAGE_SIZE: process.env.BLOG_IMAGE_SIZE || '1792x1024',
+  BLOG_AUTHOR_NAME: process.env.BLOG_AUTHOR_NAME || 'Vasu Realty',
+  BLOG_COVER_WIDTH: parseInt(process.env.BLOG_COVER_WIDTH, 10) || 1200,
+  BLOG_COVER_HEIGHT: parseInt(process.env.BLOG_COVER_HEIGHT, 10) || 630,
+
+  // ============================================================
+  // Blog cover image storage (S3-compatible, falls back to local disk)
+  // ============================================================
+  BLOG_S3_BUCKET: process.env.BLOG_S3_BUCKET || process.env.S3_BUCKET,
+  BLOG_S3_REGION: process.env.BLOG_S3_REGION || process.env.S3_REGION || process.env.AWS_REGION || 'us-east-1',
+  BLOG_S3_ACCESS_KEY_ID: process.env.BLOG_S3_ACCESS_KEY_ID || process.env.AWS_ACCESS_KEY_ID,
+  BLOG_S3_SECRET_ACCESS_KEY: process.env.BLOG_S3_SECRET_ACCESS_KEY || process.env.AWS_SECRET_ACCESS_KEY,
+  BLOG_S3_ENDPOINT: process.env.BLOG_S3_ENDPOINT || process.env.S3_ENDPOINT,
+  BLOG_S3_PUBLIC_BASE_URL: process.env.BLOG_S3_PUBLIC_BASE_URL || process.env.S3_PUBLIC_BASE_URL,
+  BLOG_S3_FORCE_PATH_STYLE: process.env.BLOG_S3_FORCE_PATH_STYLE === 'true' || process.env.S3_FORCE_PATH_STYLE === 'true',
+
+  // ============================================================
+  // Blog social publishing
+  // ============================================================
+  FACEBOOK_PAGE_ID: process.env.FACEBOOK_PAGE_ID,
+  FACEBOOK_PAGE_ACCESS_TOKEN: process.env.FACEBOOK_PAGE_ACCESS_TOKEN,
+  LINKEDIN_ORG_URN: process.env.LINKEDIN_ORG_URN,
+  LINKEDIN_ACCESS_TOKEN: process.env.LINKEDIN_ACCESS_TOKEN,
+
+  // ============================================================
+  // Blog cron automation
+  // ============================================================
+  BLOG_CRON_ENABLED: process.env.BLOG_CRON_ENABLED !== 'false',
+  BLOG_CRON_TIME: process.env.BLOG_CRON_TIME || '08:00',
+  BLOG_CRON_TZ: process.env.BLOG_CRON_TZ || 'America/New_York',
 };
 
 module.exports = config;

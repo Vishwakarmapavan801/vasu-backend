@@ -33,7 +33,7 @@ router.post('/contact', verifyCaptcha, formLimiter, asyncHandler(controller.subm
 router.post('/tours', verifyCaptcha, formLimiter, asyncHandler(controller.submitTour));
 router.post('/property-inquiries', verifyCaptcha, formLimiter, asyncHandler(controller.submitPropertyInquiry));
 router.post('/home-valuations', verifyCaptcha, formLimiter, asyncHandler(controller.submitHomeValuation));
-router.post('/newsletter', verifyCaptcha, formLimiter, asyncHandler(controller.submitNewsletter));
+router.post('/newsletter', formLimiter, asyncHandler(controller.submitNewsletter));
 router.post('/careers', verifyCaptcha, formLimiter, asyncHandler(controller.submitCareerApplication));
 router.post('/onboarding', verifyCaptcha, formLimiter, asyncHandler(controller.submitOnboarding));
 router.post('/pre-approval', verifyCaptcha, formLimiter, asyncHandler(controller.submitPreApproval));

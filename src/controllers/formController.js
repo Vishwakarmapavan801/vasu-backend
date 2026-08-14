@@ -108,7 +108,16 @@ async function handleInsert(req, res, next, serviceFn, extractData, successMsg, 
     const meta = { clientIp: getClientIp(req), userAgent: (req.headers['user-agent'] || '').slice(0, 500) };
     const record = await serviceFn(data, meta);
     if (typeof afterInsert === 'function') {
-      afterInsert(record, data).catch(() => {});
+      // Notifications are best-effort and must never block the response.
+      // The callbacks return undefined, so guard before chaining .catch.
+      try {
+        const result = afterInsert(record, data);
+        if (result && typeof result.catch === 'function') {
+          result.catch(() => {});
+        }
+      } catch {
+        // Ignore notification errors — the submission already succeeded.
+      }
     }
     return createdResponse(res, record, successMsg);
   } catch (err) {
