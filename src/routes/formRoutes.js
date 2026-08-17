@@ -41,6 +41,7 @@ router.post('/seller-request', verifyCaptcha, formLimiter, asyncHandler(controll
 router.post('/ai-demo', verifyCaptcha, formLimiter, asyncHandler(controller.submitAIDemo));
 router.post('/ai-contact', verifyCaptcha, formLimiter, asyncHandler(controller.submitAIContact));
 router.post('/buyer-agent', verifyCaptcha, formLimiter, asyncHandler(controller.submitBuyerAgentRequest));
+router.post('/property-management-enquiry', verifyCaptcha, formLimiter, asyncHandler(controller.submitPropertyManagementEnquiry));
 router.post('/property-agent-inquiry', verifyCaptcha, formLimiter, asyncHandler(controller.submitPropertyAgentInquiry));
 router.post('/request-callback', verifyCaptcha, formLimiter, asyncHandler(controller.submitCallbackRequest));
 router.post('/quick-question', verifyCaptcha, formLimiter, asyncHandler(controller.submitQuickQuestion));

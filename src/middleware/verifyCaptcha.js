@@ -57,4 +57,27 @@ async function verifyCaptcha(req, res, next) {
   next();
 }
 
-module.exports = { verifyCaptcha };
+/**
+ * CAPTCHA verification middleware that only enforces when the backend has a
+ * RECAPTCHA_SECRET_KEY configured.
+ *
+ * Used by /auth/login and /auth/register: the frontend renders the CAPTCHA
+ * widget whenever VITE_RECAPTCHA_SITE_KEY is set, and the token must then be
+ * verified server-side (it is never trusted client-side). If the secret key is
+ * absent from the deployment, CAPTCHA is skipped with a warning so auth is not
+ * silently broken by a missing secret (matches how optional services like
+ * SendGrid/Stripe degrade gracefully).
+ *
+ * @param {import('express').Request} req
+ * @param {import('express').Response} res
+ * @param {import('express').NextFunction} next
+ */
+async function captchaIfConfigured(req, res, next) {
+  if (!process.env.RECAPTCHA_SECRET_KEY) {
+    console.warn('[CAPTCHA] RECAPTCHA_SECRET_KEY not set — skipping server-side CAPTCHA verification for', req.originalUrl);
+    return next();
+  }
+  return verifyCaptcha(req, res, next);
+}
+
+module.exports = { verifyCaptcha, captchaIfConfigured };

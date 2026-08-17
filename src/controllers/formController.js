@@ -445,7 +445,7 @@ async function submitAIContact(req, res, next) {
 // POST /api/buyer-agent
 // ================================================================
 async function submitBuyerAgentRequest(req, res, next) {
-  const { name, email, phone, preferredLocation, budgetMin, budgetMax, propertyType, bedrooms, bathrooms, timeline, additionalRequirements } = req.body;
+  const { name, email, phone, preferredLocation, budgetMin, budgetMax, propertyType, bedrooms, bathrooms, timeline, additionalRequirements, smsConsent } = req.body;
   const errors = {};
 
   const nameErr = validateName(name);
@@ -475,12 +475,50 @@ async function submitBuyerAgentRequest(req, res, next) {
     bathrooms: bathrooms !== undefined && bathrooms !== null && bathrooms !== '' ? Number(bathrooms) : null,
     timeline: (timeline || '').trim(),
     additionalRequirements: (additionalRequirements || '').trim(),
+    smsConsent: !!smsConsent,
   };
   return handleInsert(req, res, next, formService.createBuyerAgentRequest, () => buyerData,
     'Your buyer agent request has been submitted. A dedicated agent will contact you within 24 hours.',
     (record, data) => {
       emailService.sendBuyerAgentNotification(data).catch(() => {});
     });
+}
+
+// ================================================================
+// POST /api/property-management-enquiry
+// ================================================================
+async function submitPropertyManagementEnquiry(req, res, next) {
+  const { name, email, phone, propertyAddress, propertyType, units, message, smsConsent } = req.body;
+  const errors = {};
+
+  const nameErr = validateName(name);
+  if (nameErr) errors.name = nameErr;
+  const emailErr = validateEmail(email);
+  if (emailErr) errors.email = emailErr;
+  const phoneErr = validatePhone(phone, true);
+  if (phoneErr) errors.phone = phoneErr;
+
+  const addrErr = requiredString(propertyAddress, 'Property Address');
+  if (addrErr) errors.propertyAddress = addrErr;
+
+  if (units !== undefined && units !== null && units !== '') {
+    const n = Number(units);
+    if (!Number.isInteger(n) || n < 1 || n > 1000) {
+      errors.units = 'Number of units must be a whole number between 1 and 1000';
+    }
+  }
+
+  if (Object.keys(errors).length) return validationError(res, errors);
+
+  return handleInsert(req, res, next, formService.createPropertyManagementEnquiry, () => ({
+    name: name.trim(), email: email.trim().toLowerCase(),
+    phone: phone.trim(),
+    propertyAddress: (propertyAddress || '').trim(),
+    propertyType: (propertyType || '').trim(),
+    units: units !== undefined && units !== null && units !== '' ? Number(units) : null,
+    message: (message || '').trim(),
+    smsConsent: !!smsConsent,
+  }), 'Your property management enquiry has been submitted. Our team will contact you within 24 hours.');
 }
 
 // ================================================================
@@ -574,6 +612,7 @@ module.exports = {
   submitAIDemo,
   submitAIContact,
   submitBuyerAgentRequest,
+  submitPropertyManagementEnquiry,
   submitPropertyAgentInquiry,
   submitCallbackRequest,
   submitQuickQuestion,

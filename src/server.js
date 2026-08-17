@@ -362,8 +362,11 @@ app.use('/api', notFoundHandler);
 app.use(errorHandler);
 
 // SPA fallback for production
+// NOTE: Express 5 (path-to-regexp v8) rejects the old '*' wildcard with
+// "Missing parameter name at index 1" at startup, which crashed the server
+// in production. '/*splat' is the Express 5 wildcard syntax.
 if (NODE_ENV === 'production') {
-  app.get('*', (_req, res) => {
+  app.get('/*splat', (_req, res) => {
     res.sendFile(path.join(__dirname, '../../frontend/dist', 'index.html'));
   });
 }

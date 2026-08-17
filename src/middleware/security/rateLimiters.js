@@ -22,7 +22,13 @@ const authLimiter = rateLimit({
 const publicLimiter = rateLimit({
   windowMs: 15 * 60 * 1000,
   max: 60,
-  skip: isDev,
+  // Skip image proxy requests: /rent renders dozens of cards and each card
+  // requests multiple /api/image variants. The 60/15min budget was returning
+  // 429s for the majority of image requests in production, which showed up as
+  // gray/blank listing images. The image proxy already has its own bounded
+  // concurrency + adaptive CDN rate-limit handling, so it must not share the
+  // generic API budget.
+  skip: (req) => isDev() || req.path.startsWith('/image/'),
   standardHeaders: true,
   legacyHeaders: false,
   message: { success: false, error: 'Too many requests, please try again later.' },

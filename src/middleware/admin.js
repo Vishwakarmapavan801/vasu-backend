@@ -27,6 +27,7 @@ const ROLE_PERMISSIONS = {
   users: new Set(['super_admin', 'admin', 'agent_manager']),
   posts: new Set(['super_admin', 'admin', 'moderator', 'content_manager']),
   leads: new Set(['super_admin', 'admin', 'agent_manager', 'mls_manager']),
+  enquiries: new Set(['super_admin', 'admin', 'agent_manager', 'mls_manager']),
   transactions: new Set(['super_admin', 'admin', 'agent_manager', 'mls_manager']),
   media: new Set(['super_admin', 'admin', 'moderator', 'content_manager', 'mls_manager']),
   settings: new Set(['super_admin', 'admin']),

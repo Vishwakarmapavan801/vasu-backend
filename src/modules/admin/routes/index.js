@@ -10,6 +10,7 @@ const usersAdminController = require('../controllers/usersAdminController');
 const mlsAdminController = require('../controllers/mlsAdminController');
 const postsAdminController = require('../controllers/postsAdminController');
 const leadsAdminController = require('../controllers/leadsAdminController');
+const enquiriesAdminController = require('../controllers/enquiriesAdminController');
 const transactionsAdminController = require('../controllers/transactionsAdminController');
 const mediaAdminController = require('../controllers/mediaAdminController');
 const settingsAdminController = require('../controllers/settingsAdminController');
@@ -77,6 +78,12 @@ router.get('/leads', requireAuth, requireRole('leads'), leadsAdminController.lis
 router.get('/leads/:id', requireAuth, requireRole('leads'), leadsAdminController.getById);
 router.patch('/leads/:id/status', requireAuth, requireRole('leads'), leadsAdminController.updateStatus);
 router.patch('/leads/:id/reassign', requireAuth, requireRole('leads'), leadsAdminController.reassign);
+
+// Enquiries (Property Management + Buyer forms)
+router.get('/enquiries', requireAuth, requireRole('enquiries'), enquiriesAdminController.list);
+router.get('/enquiries/:source/:id', requireAuth, requireRole('enquiries'), enquiriesAdminController.getById);
+router.patch('/enquiries/:source/:id/status', requireAuth, requireRole('enquiries'), enquiriesAdminController.updateStatus);
+router.patch('/enquiries/:source/:id/assign', requireAuth, requireRole('enquiries'), enquiriesAdminController.assignAgent);
 
 // Transactions (closing workflow)
 router.get('/transactions', requireAuth, requireRole('transactions'), transactionsAdminController.list);

@@ -315,23 +315,27 @@ async function serveMediaImage(req, res, next) {
       return;
     }
 
+    // IMPORTANT: never respond 200 with a placeholder and cache it.
+    // A cached 1x1/blank image makes the browser treat the failure as success,
+    // so the frontend's fallback chain (raw CDN MediaURL) never runs and the
+    // card stays a gray block for the cache lifetime. Return a real error with
+    // no-store so the browser fires onerror and the listing falls back to the
+    // direct MLS CDN image.
     if (msg.includes('not found in MLS') || msg.includes('Media key not found')) {
-      return res.status(404).json({ success: false, error: 'Media not found' });
+      res.set('Cache-Control', 'no-store');
+      return res.status(404).end();
     }
     if (msg.includes('timeout') || msg.includes('ETIMEDOUT') || msg.includes('ECONNABORTED')) {
-      res.set('Content-Type', 'image/svg+xml');
-      res.set('Cache-Control', 'public, max-age=300');
-      return res.end('<svg xmlns="http://www.w3.org/2000/svg" width="1" height="1"/>');
+      res.set('Cache-Control', 'no-store');
+      return res.status(504).end();
     }
-    if (msg.includes('429') || msg.includes('rate limit')) {
-      res.set('Content-Type', 'image/svg+xml');
-      res.set('Cache-Control', 'public, max-age=300');
-      return res.end('<svg xmlns="http://www.w3.org/2000/svg" width="1" height="1"/>');
+    if (msg.includes('429') || msg.includes('rate limit') || msg.includes('503')) {
+      res.set('Cache-Control', 'no-store');
+      return res.status(503).end();
     }
 
-    res.set('Content-Type', 'image/svg+xml');
-    res.set('Cache-Control', 'public, max-age=300');
-    res.end('<svg xmlns="http://www.w3.org/2000/svg" width="1" height="1"/>');
+    res.set('Cache-Control', 'no-store');
+    res.status(502).end();
   }
 }
 
@@ -357,22 +361,13 @@ const SUPPORTED_CITIES_MAP = {
 
 async function getCities(req, res, next) {
   try {
-    const results = await Promise.allSettled(
-      Object.entries(SUPPORTED_CITIES_MAP).map(async ([slug, info]) => {
-        const cityName = slug.split('-').map(w => w.charAt(0).toUpperCase() + w.slice(1)).join(' ');
-        const data = await propertyService.getPropertiesByCity(cityName, { top: 1 });
-        const first = data.data && data.data[0];
-        return {
-          ...info,
-          count: data.totalCount || 0,
-          image: first?.Media?.[0]?.MediaProxyURL || first?.Media?.[0]?.MediaURL || first?.image || '',
-        };
-      })
-    );
-    const cities = results.map((r, i) => {
-      const slug = Object.keys(SUPPORTED_CITIES_MAP)[i];
-      const info = SUPPORTED_CITIES_MAP[slug];
-      return r.status === 'fulfilled' ? r.value : { ...info, count: 0, image: '' };
+    const cityNames = Object.values(SUPPORTED_CITIES_MAP).map(c => c.name);
+    const aggregated = await propertyService.getCitiesAggregated(cityNames);
+
+    const cities = Object.entries(SUPPORTED_CITIES_MAP).map(([slug, info]) => {
+      const key = info.name.toLowerCase();
+      const data = aggregated[key] || { count: 0, image: '' };
+      return { ...info, count: data.count, image: data.image };
     });
     return res.json({ success: true, data: cities });
   } catch (err) {

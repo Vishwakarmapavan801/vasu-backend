@@ -99,30 +99,41 @@ function buildFAQStructuredData(faqs) {
 }
 
 function buildLocalBusinessStructuredData() {
-  return {
+  const business = {
     '@context': 'https://schema.org',
     '@type': 'RealEstateAgent',
     name: 'Vasu Realty',
     image: `${process.env.CLIENT_URL}/logo.png`,
     url: process.env.CLIENT_URL,
-    telephone: process.env.BUSINESS_PHONE || '+17045551234',
-    address: {
-      '@type': 'PostalAddress',
-      streetAddress: process.env.BUSINESS_STREET || '123 Main St',
-      addressLocality: process.env.BUSINESS_CITY || 'Charlotte',
-      addressRegion: process.env.BUSINESS_STATE || 'NC',
-      postalCode: process.env.BUSINESS_ZIP || '28202',
-      addressCountry: 'US',
-    },
-    geo: {
-      '@type': 'GeoCoordinates',
-      latitude: parseFloat(process.env.BUSINESS_LAT) || 35.2271,
-      longitude: parseFloat(process.env.BUSINESS_LNG) || -80.8431,
-    },
     openingHours: 'Mo-Fr 09:00-18:00',
     priceRange: '$$',
     areaServed: ['Charlotte, NC', 'Rock Hill, SC', 'Fort Mill, SC', 'Lake Wylie, SC'],
   };
+
+  // Only include address/contact fields when env vars are actually configured,
+  // so placeholder data never leaks into structured markup.
+  if (process.env.BUSINESS_PHONE) {
+    business.telephone = process.env.BUSINESS_PHONE;
+  }
+  if (process.env.BUSINESS_STREET || process.env.BUSINESS_CITY) {
+    business.address = {
+      '@type': 'PostalAddress',
+      streetAddress: process.env.BUSINESS_STREET || '',
+      addressLocality: process.env.BUSINESS_CITY || 'Charlotte',
+      addressRegion: process.env.BUSINESS_STATE || 'NC',
+      postalCode: process.env.BUSINESS_ZIP || '',
+      addressCountry: 'US',
+    };
+  }
+  if (process.env.BUSINESS_LAT && process.env.BUSINESS_LNG) {
+    business.geo = {
+      '@type': 'GeoCoordinates',
+      latitude: parseFloat(process.env.BUSINESS_LAT),
+      longitude: parseFloat(process.env.BUSINESS_LNG),
+    };
+  }
+
+  return business;
 }
 
 function generateMetaTags({ title, description, image, url, type = 'website' }) {

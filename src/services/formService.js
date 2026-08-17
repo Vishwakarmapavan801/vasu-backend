@@ -186,15 +186,32 @@ async function createAIContactRequest(data, meta = {}) {
 // ================================================================
 // Buyer Agent Requests
 // ================================================================
-async function createBuyerAgentRequest({ name, email, phone, preferredLocation, budgetMin, budgetMax, propertyType, bedrooms, bathrooms, timeline, additionalRequirements }, meta = {}) {
+async function createBuyerAgentRequest({ name, email, phone, preferredLocation, budgetMin, budgetMax, propertyType, bedrooms, bathrooms, timeline, additionalRequirements, smsConsent }, meta = {}) {
   const row = await insertRow('buyer_agent_requests', {
     name, email, phone, preferred_location: preferredLocation || null,
     budget_min: budgetMin || null, budget_max: budgetMax || null,
     property_type: propertyType || null, bedrooms: bedrooms || null,
     bathrooms: bathrooms || null, timeline: timeline || null,
     additional_requirements: additionalRequirements || null,
+    sms_consent: !!smsConsent,
   });
   submitToJotForm('buyerAgent', { name, email, phone, preferredLocation, budgetMin, budgetMax, propertyType, bedrooms, bathrooms, timeline, additionalRequirements }, { ...jotFormMeta('buyerAgent', { email }, meta), dbRecordId: row.id }).catch(() => {});
+  return row;
+}
+
+// ================================================================
+// Property Management Enquiries ("Start With Us" form)
+// ================================================================
+async function createPropertyManagementEnquiry({ name, email, phone, propertyAddress, propertyType, units, message, smsConsent }, meta = {}) {
+  const row = await insertRow('property_management_enquiries', {
+    name, email, phone: phone || null,
+    property_address: propertyAddress || null,
+    property_type: propertyType || null,
+    units: units || null,
+    message: message || null,
+    sms_consent: !!smsConsent,
+  });
+  submitToJotForm('propertyManagementEnquiry', { name, email, phone, propertyAddress, propertyType, units, message, smsConsent }, { ...jotFormMeta('propertyManagementEnquiry', { email }, meta), dbRecordId: row.id }).catch(() => {});
   return row;
 }
 
@@ -253,6 +270,7 @@ module.exports = {
   createAIDemoRequest,
   createAIContactRequest,
   createBuyerAgentRequest,
+  createPropertyManagementEnquiry,
   createPropertyAgentInquiry,
   createCallbackRequest,
   createQuickQuestion,

@@ -49,11 +49,10 @@ async function getProperties(params = {}) {
   const top = Math.max(1, parseInt(params.top, 10) || 20);
   const skip = Math.max(0, parseInt(params.skip, 10) || 0);
 
-  // Property cards render all real MLS images (Zillow-style carousels), so
-  // every property payload carries its complete media array. The frontend
-  // lazy-loads images (first visible + neighbor preloads only), so full media
-  // arrays do not cause a burst of CDN requests.
-  const maxMedia = 0; // 0 = all media
+  // Property cards show a small image carousel (1-5 thumbnails). Limiting
+  // media per property keeps list/search payloads compact. Detail pages use
+  // getPropertyByIdWithAllMedia which requests maxMedia=0 (all media).
+  const maxMedia = 5;
 
   // Step 1: Detect search type if 'q' is provided
   let mlsFilters = {};
@@ -618,8 +617,8 @@ async function getPropertiesByCity(cityName, params = {}) {
   const rawCities = new Set((data.value || []).map(p => String(p.City || '').trim()).filter(Boolean));
   const rawOsn = new Set((data.value || []).map(p => String(p.OriginatingSystemName || '').trim()).filter(Boolean));
 
-  // Normalize with all media for list views (cards render full carousels)
-  let properties = (data.value || []).map(p => normalizeProperty(p, { maxMedia: 0 }));
+  // Limit media per property for list views (cards only need thumbnails)
+  let properties = (data.value || []).map(p => normalizeProperty(p, { maxMedia: 5 }));
   const normalizedCount = properties.length;
 
   // Apply local city filter (case-insensitive, exact match)
@@ -707,6 +706,57 @@ async function getPropertiesByCity(cityName, params = {}) {
     hasMore: (skip + top) < totalCount,
     city: cityName,
   };
+}
+
+/**
+ * Get city aggregation data in a single MLS call.
+ * Instead of calling getPropertiesByCity() for each of 7 cities (7x500 MLS
+ * records with heavy overlap), this fetches one batch of Active listings and
+ * groups by city locally to extract counts and representative images.
+ *
+ * @param {string[]} cityNames - Array of city names to aggregate
+ * @returns {Promise<Object>} Map of lowercased city → { count, image }
+ */
+async function getCitiesAggregated(cityNames) {
+  const fetchLimit = 500;
+  const mlsFilters = { mlgCanView: true, standardStatus: 'Active' };
+  const odataOptions = { top: fetchLimit, skip: 0, count: true, orderby: 'ModificationTimestamp desc' };
+  const queryString = buildQuery(mlsFilters, odataOptions);
+  const url = `${MLS_GRID_BASE_URL}/Property?${queryString}`;
+  const data = await fetchWithRetry(url);
+
+  // Group properties by city
+  const cityMap = {};
+  for (const p of (data.value || [])) {
+    const city = String(p.City || '').trim();
+    if (!city) continue;
+    const key = city.toLowerCase();
+    if (!cityMap[key]) {
+      cityMap[key] = { count: 0, properties: [] };
+    }
+    cityMap[key].count++;
+    // Keep up to 2 properties per city for image selection
+    if (cityMap[key].properties.length < 2) {
+      cityMap[key].properties.push(normalizeProperty(p, { maxMedia: 1 }));
+    }
+  }
+
+  // Build result map for requested cities
+  const result = {};
+  for (const name of cityNames) {
+    const key = name.toLowerCase().trim();
+    const entry = cityMap[key];
+    if (entry && entry.properties.length > 0) {
+      const first = entry.properties[0];
+      result[key] = {
+        count: entry.count,
+        image: first?.Media?.[0]?.MediaProxyURL || first?.Media?.[0]?.MediaURL || first?.image || '',
+      };
+    } else {
+      result[key] = { count: 0, image: '' };
+    }
+  }
+  return result;
 }
 
 /**
@@ -905,5 +955,6 @@ module.exports = {
   getLookupData,
   getMedia,
   getActiveListings,
+  getCitiesAggregated,
   verifyConnection,
 };

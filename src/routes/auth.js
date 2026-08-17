@@ -10,6 +10,7 @@ const rateLimit = require('express-rate-limit');
 const asyncHandler = require('../middleware/asyncHandler');
 const controller = require('../controllers/authController');
 const { requireAuth } = require('../middleware/auth');
+const { captchaIfConfigured } = require('../middleware/verifyCaptcha');
 
 const router = Router();
 
@@ -24,8 +25,10 @@ const authLimiter = rateLimit({
 });
 
 // Public endpoints (rate-limited)
-router.post('/register', authLimiter, asyncHandler(controller.register));
-router.post('/login', authLimiter, asyncHandler(controller.login));
+// CAPTCHA is verified server-side when RECAPTCHA_SECRET_KEY is configured —
+// the frontend collects the token but it is never trusted client-side.
+router.post('/register', authLimiter, captchaIfConfigured, asyncHandler(controller.register));
+router.post('/login', authLimiter, captchaIfConfigured, asyncHandler(controller.login));
 router.post('/google', authLimiter, asyncHandler(controller.googleLogin));
 router.post('/forgot-password', authLimiter, asyncHandler(controller.forgotPassword));
 router.post('/reset-password/:token', asyncHandler(controller.resetPassword));
